@@ -11,7 +11,7 @@
 
 https://github.com/user-attachments/assets/6cce7ca7-7817-4406-b6c4-6d4e8c414ed4
 
-Try also: Pallaidium - a genAI Movie Studio for free: https://github.com/tin2tin/Pallaidium
+Try also Pallaidium - a genAI Movie Studio for free: https://github.com/tin2tin/Pallaidium
 
 This add-on can't work without:
 
