@@ -48,6 +48,9 @@ To install an add-on in Blender, follow these simple steps:
 - On the first run, you must enable the environment, and dependencies will be downloaded.
 - On each start-up of Blender you must click the Enable Environment, to get it running.
 
+### 10. **Write a Prompt**
+- Prompt something like this to get at full body character: "boy, wide-shot, full body, 2d, shoes/feet, in the style of a comic, neutral background"
+
 That's it! Your add-on should now be installed and ready to use in Blender.
 
 ## Other Software
