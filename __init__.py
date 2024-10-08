@@ -1,5 +1,5 @@
 bl_info = {
-    "name": "Character Generator with FLUX",
+    "name": "2D Cutout People",
     "author": "tintwotin",
     "version": (1, 0),
     "blender": (3, 0, 0),
