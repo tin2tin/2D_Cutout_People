@@ -19,7 +19,7 @@ To install an add-on in Blender, follow these simple steps:
    - From [here!](https://github.com/tin2tin/2D_Billboard_People/archive/refs/heads/main.zip)
 
 ### 2. **Open Blender:**
-   - Launch Blender on your computer.
+   - Launch Blender on your computer, by right-clicking on the Blender icon and starting it as administrator.
 
 ### 3. **Go to Preferences:**
    - Click on `Edit` (on Windows) or `Blender` (on macOS) in the top menu.
