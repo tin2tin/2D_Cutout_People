@@ -30,7 +30,7 @@ To install an add-on in Blender, follow these simple steps:
 
 ### 5. **Install the Add-on:**
    - In the Add-ons tab, click the **Install** button at the top-right corner of the window.
-   - Browse to the `.zip` file or `.py` file of the add-on you downloaded.
+   - Browse to the `.zip` file of the add-on you downloaded.
    - Select the file and click **Install Add-on**.
 
 ### 6. **Enable the Add-on:**
@@ -42,7 +42,11 @@ To install an add-on in Blender, follow these simple steps:
    - If you want the add-on to load automatically the next time you start Blender, click **Save Preferences** at the bottom left of the Preferences window.
 
 ### 8. **Use the Add-on:**
-   - The functionality of the add-on will now be available within Blender, usually under a specific tab or menu depending on the type of add-on.
+   - The functionality of the add-on will now be available within Blender, in the sidebar of the 3D View.
+
+### 9. **Enable Enviroment:**
+- On the first run, you must enable the environment, and dependencies will be downloaded.
+- On each start-up of Blender you must click the Enable Environment, to get it running.
 
 That's it! Your add-on should now be installed and ready to use in Blender.
 
