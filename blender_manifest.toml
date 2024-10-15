@@ -1,22 +1,32 @@
-{
-    "version": "v1",
-    "blocklist": [],
-    "data": [
-        {
-            "id": "2d_cutout_people",
-            "name": "2D Cutout People",
-            "tagline": "Do 2D Cutout People with genAI",
-            "version": "1.0",
-            "type": "add-on",
-            "archive_size": null,
-            "archive_hash": null,
-            "archive_url": null,
-            "blender_version_min": "3.0.0",
-            "maintainer": "tintwotin",
-            "tags": ["3D View"],
-            "license": ["SPDX:GPL-3.0-or-later"],
-            "website": null,
-            "schema_version": "1.0.0"
-        }
-    ]
-}
+schema_version = "1.0.0"
+
+# Manifest file for the 2D Cutout People extension
+id = "2d_cutout_people"
+version = "1.0.0"
+name = "2D Cutout People"
+tagline = "AI Generate 2d cutout People"
+maintainer = "tintwotin"
+# Supported types: "add-on", "theme"
+type = "add-on"
+
+# # Optional: link to documentation, support, source files, etc
+# website = "https://extensions.blender.org/add-ons/2d-cutout-people/"
+
+# # Optional: tag list defined by Blender and server, see:
+# # https://docs.blender.org/manual/en/dev/advanced/extensions/tags.html
+# tags = ["3D View", "Sequencer", "AI"]
+
+blender_version_min = "3.0.0"
+# # Optional: Blender version that the extension does not support, earlier versions are supported.
+# # This can be omitted and defined later on the extensions platform if an issue is found.
+# blender_version_max = "5.1.0"
+
+# License conforming to https://spdx.org/licenses/ (use "SPDX: prefix)
+# https://docs.blender.org/manual/en/dev/advanced/extensions/licenses.html
+license = [
+  "SPDX:GPL-3.0-or-later",
+]
+# # Optional: required by some licenses.
+# copyright = [
+#   "2024 tintwotin",
+# ]
