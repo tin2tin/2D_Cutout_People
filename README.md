@@ -62,7 +62,7 @@ https://github.com/huggingface/diffusers
 
 https://huggingface.co/ZhengPeng7/BiRefNet
 
-https://huggingface.co/black-forest-labs/FLUX.1-schnell
+https://huggingface.co/black-forest-labs/FLUX.1-dev
 
 
 
