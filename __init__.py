@@ -1,10 +1,10 @@
 bl_info = {
-    "name": "2D Cutout People",
+    "name": "2D Asset Generator with FLUX",
     "author": "tintwotin",
     "version": (1, 0),
     "blender": (3, 0, 0),
     "category": "3D View",
-    "location": "3D Editor > Sidebar > 2D People",
+    "location": "3D Editor > Sidebar > 2D Asset",
     "description": "AI Generate media in the VSE",
 }
 
@@ -15,41 +15,53 @@ import sys
 from PIL import Image, ImageFilter
 import math
 
+def flush():
+    import torch
+    import gc
+    gc.collect()
+    torch.cuda.empty_cache()
+    torch.cuda.reset_max_memory_allocated()
+    #torch.cuda.reset_peak_memory_stats()
+
+def python_exec():
+  return sys.executable
+
 
 class FLUX_OT_SetupEnvironment(bpy.types.Operator):
-    """Set up a virtual environment and install dependencies"""
+    """Set up a environment and install dependencies"""
 
     bl_idname = "object.setup_flux_env"
     bl_label = "Set up Environment"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        try:
+        #try:
+            #import sys
             # Get the current Blender Python executable
-            python_executable = sys.executable
+            #python_executable = sys.executable
 
-            # Path for virtual environment
-            venv_dir = bpy.path.abspath("//flux_venv")
+#            # Path for virtual environment
+#            venv_dir = bpy.path.abspath("//flux_venv")
 
-            # Step 1: Create the virtual environment
-            if not os.path.exists(venv_dir):
-                subprocess.run([python_executable, "-m", "venv", venv_dir], check=True)
-                self.report({'INFO'}, f"Virtual environment created at {venv_dir}")
-            else:
-                self.report({'INFO'}, "Virtual environment already exists.")
+#            # Step 1: Create the virtual environment
+#            if not os.path.exists(venv_dir):
+#                subprocess.run([python_executable, "-m", "venv", venv_dir], check=True)
+#                self.report({'INFO'}, f"Virtual environment created at {venv_dir}")
+#            else:
+#                self.report({'INFO'}, "Virtual environment already exists.")
             # Step 2: Install dependencies
-            self.install_dependencies(venv_dir)
+        self.install_dependencies(python_exec())
 
-            return {'FINISHED'}
-        except Exception as e:
-            self.report({'ERROR'}, f"Error setting up environment: {str(e)}")
-            return {'CANCELLED'}
+        return {'FINISHED'}
+#        except Exception as e:
+#            self.report({'ERROR'}, f"Error setting up environment: {str(e)}")
+#            return {'CANCELLED'}
 
     def install_dependencies(self, venv_dir):
         """Install required Python packages in the virtual environment"""
-        python_executable = os.path.join(venv_dir, "bin", "python")  # Linux/Unix path to python
-        if sys.platform == "win32":
-            python_executable = os.path.join(venv_dir, "Scripts", "python.exe")  # Windows path to python
+        python_executable = venv_dir#os.path.join(venv_dir, "bin", "python")  # Linux/Unix path to python
+#        if sys.platform == "win32":
+#            python_executable = os.path.join(venv_dir, "Scripts", "python.exe")  # Windows path to python
         subprocess.check_call([
             python_executable,
             "-m",
@@ -70,39 +82,89 @@ class FLUX_OT_SetupEnvironment(bpy.types.Operator):
             "diffusers",
             "transformers",
             "Pillow",
+            "bitsandbytes",
+            "botocore",
+            "ml-dtypes",
+            "protobuf==3.20.1",
+            "tqdm",
+            "markupsafe",
         ]
 
         # Install packages using the virtual environment's pip
         for package in packages:
-            subprocess.run([python_executable, "-m", "pip", "install", package, "--upgrade"], check=True)
-        self.report({'INFO'}, "Dependencies installed successfully.")
+            subprocess.run([python_executable, "-m", "pip", "install", "--disable-pip-version-check", "--use-deprecated=legacy-resolver", package, "--no-warn-script-location", "--upgrade"], check=True)
+        self.report({'INFO'}, "\nDependencies installed successfully.")
+        
+
+#def get_unique_asset_name(self, context):
+#    """Generates a unique asset name if there is a conflict."""
+#    base_name = context.scene.asset_name
+#    if base_name == "" or base_name == None:
+#        prompt = context.scene.asset_prompt
+#        words = s.split()
+#        base_name = words[:2]
+#        if base_name == "" or base_name == None: 
+#            base_name = "Asset"
+#        context.scene.asset_name = base_name
+#    existing_names = {obj.name for obj in bpy.data.objects if obj.asset_data}
+
+#    # If no conflict, return the original name
+#    if base_name not in existing_names:
+#        return base_name
+#    # Regular expression to detect if the name has a number in parentheses
+#    match = re.search(r"\((\d+)\)$", base_name)
+
+#    if match:
+#        # If there's a number, increment it
+#        base_name = base_name[: match.start()].strip()
+#        counter = int(match.group(1)) + 1
+#    else:
+#        # If no number, start at 1
+#        counter = 1
+#    unique_name = f"{base_name} ({counter})"
+#    while unique_name in existing_names:
+#        counter += 1
+#        unique_name = f"{base_name} ({counter})"
+#    context.scene.asset_name = unique_name
+
+#    return unique_name
 
 
 def get_unique_asset_name(self, context):
-    """Generates a unique asset name if there is a conflict."""
+    """Generates a unique asset name if there is a conflict, ensuring a name is always returned."""
+    
+    # Retrieve base name and check for validity
     base_name = context.scene.asset_name
-    existing_names = {obj.name for obj in bpy.data.objects if obj.asset_data}
+    if not base_name:
+        # If base name is missing, use the asset prompt or a default
+        prompt = context.scene.asset_prompt
+        base_name = "_".join(prompt.split()[:2]) if prompt else "Asset"
+        context.scene.asset_name = base_name
 
-    # If no conflict, return the original name
+    # Collect existing names to detect conflicts
+    existing_names = {obj.name for obj in bpy.data.objects if getattr(obj, 'asset_data', None)}
+
+    # If the base name is unique, return it directly
     if base_name not in existing_names:
-        return base_name
-    # Regular expression to detect if the name has a number in parentheses
-    match = re.search(r"\((\d+)\)$", base_name)
+        return
 
+    # Attempt to extract an existing number suffix in parentheses, if present
+    match = re.search(r"\((\d+)\)$", base_name)
     if match:
-        # If there's a number, increment it
         base_name = base_name[: match.start()].strip()
         counter = int(match.group(1)) + 1
     else:
-        # If no number, start at 1
         counter = 1
+
+    # Generate a unique name by incrementing the counter until no conflicts remain
     unique_name = f"{base_name} ({counter})"
     while unique_name in existing_names:
         counter += 1
         unique_name = f"{base_name} ({counter})"
+    
+    # Set the unique name in the context and return it
     context.scene.asset_name = unique_name
-
-    return unique_name
+    return
 
 
 def get_unique_file_name(base_path):
@@ -126,25 +188,26 @@ def get_unique_file_name(base_path):
     return unique_path
 
 
-class FLUX_OT_GenerateCharacter(bpy.types.Operator):
-    """Generate character image from description and convert to 3D object"""
+class FLUX_OT_GenerateAsset(bpy.types.Operator):
+    """Generate asset image from description and convert to 3D object"""
 
-    bl_idname = "object.generate_character"
-    bl_label = "Generate Character"
+    bl_idname = "object.generate_asset"
+    bl_label = "Generate Asset"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         try:
             # Fetch the character description from the scene
-            description = context.scene.character_description
+            description = context.scene.asset_prompt
 
             # Ensure the description is not empty
             if not description:
-                self.report({'ERROR'}, "Character description is empty.")
+                self.report({'ERROR'}, "Asset description is empty.")
                 return {'CANCELLED'}
 
             # Generate image using FLUX
             image_path = self.generate_image(context, description)
+            print(image_path)
 
             # Remove background from the generated image
             transparent_image_path = self.remove_background(context, image_path)
@@ -157,6 +220,61 @@ class FLUX_OT_GenerateCharacter(bpy.types.Operator):
             self.report({'ERROR'}, f"Error: {str(e)}")
             return {'CANCELLED'}
 
+#    #SD 3.5 Medium
+#    def generate_image(self, context, description):
+#        """Generates an image using the Stable Diffusion 3 model based on user input."""
+
+#        # Import dependencies inside the method to avoid potential module issues before installation
+#        from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel
+#        import torch
+
+#        # Define model configuration and ID
+#        model_id = "stabilityai/stable-diffusion-3.5-medium"
+#        asset_name = context.scene.asset_name
+
+#        # Configure quantization settings for 4-bit loading
+#        nf4_config = BitsAndBytesConfig(
+#            load_in_4bit=True,
+#            bnb_4bit_quant_type="nf4",
+#            bnb_4bit_compute_dtype=torch.bfloat16
+#        )
+
+#        # Initialize the transformer model with quantization settings
+#        model_nf4 = SD3Transformer2DModel.from_pretrained(
+#            model_id,
+#            subfolder="transformer",
+#            quantization_config=nf4_config,
+#            torch_dtype=torch.bfloat16
+#        )
+
+#        # Load the Stable Diffusion pipeline with the transformer model
+#        pipeline = StableDiffusion3Pipeline.from_pretrained(
+#            model_id,
+#            transformer=model_nf4,
+#            torch_dtype=torch.bfloat16
+#        )
+
+#        # Enable CPU offloading for memory optimization
+#        pipeline.enable_model_cpu_offload()
+
+#        # Construct the prompt and generate the image
+#        prompt = "neutral background, " + description
+#        out = pipeline(
+#            prompt=prompt,
+#            guidance_scale=2.8,
+#            height=1440,
+#            width=1440,
+#            num_inference_steps=30,
+#            max_sequence_length=256,
+#        ).images[0]
+
+#        # Save the generated image to the specified path
+#        image_path = bpy.path.abspath(f"//{asset_name}_generated_image.png")
+#        out.save(image_path)
+#        return image_path
+
+
+    #FLUX
     def generate_image(self, context, description):
         """Generates an image using the FLUX model based on the user input."""
 
@@ -166,20 +284,37 @@ class FLUX_OT_GenerateCharacter(bpy.types.Operator):
 
         asset_name = context.scene.asset_name
 
-        pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
+#        pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
 
-        pipe.enable_sequential_cpu_offload()
-        pipe.enable_vae_slicing()
-        pipe.vae.enable_tiling()
+#        pipe.enable_sequential_cpu_offload()
+#        pipe.enable_vae_slicing()
+#        pipe.vae.enable_tiling()
+
+        from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
+        image_model_card = "ChuckMcSneed/FLUX.1-dev"
+        nf4_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_compute_dtype=torch.bfloat16
+        )
+        model_nf4 = FluxTransformer2DModel.from_pretrained(
+            image_model_card,
+            subfolder="transformer",
+            quantization_config=nf4_config,
+            torch_dtype=torch.bfloat16
+        )
+
+        pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
+        pipe.enable_model_cpu_offload()
 
         # Generate the image
         prompt = "wide-shot, full body shot, neutral background, " + description
         out = pipe(
             prompt=prompt,
-            guidance_scale=0.0,
+            guidance_scale=3.8,
             height=768,
             width=1360,
-            num_inference_steps=4,
+            num_inference_steps=25,
             max_sequence_length=256,
         ).images[0]
 
@@ -316,7 +451,7 @@ class FLUX_OT_GenerateCharacter(bpy.types.Operator):
         # Ensure the image exists
         if not os.path.exists(transparent_image_path):
             self.report({'ERROR'}, f"Image not found at {transparent_image_path}")
-            return
+            return {'CANCELLED'}
 
         # Load the image into Blender
         image = image = Image.open(transparent_image_path).convert("RGB")
@@ -332,23 +467,62 @@ class FLUX_OT_GenerateCharacter(bpy.types.Operator):
         material = bpy.data.materials.new(name="ImageMaterial")
         material.use_nodes = True
         bsdf = material.node_tree.nodes.get("Principled BSDF")
-        bsdf.inputs[12].default_value = 0
+        bsdf.inputs[12].default_value = 0  # Set Alpha to 0 for transparency
 
         # Load the image into the material's base color and alpha inputs
         tex_image_node = material.node_tree.nodes.new("ShaderNodeTexImage")
         tex_image_node.image = bpy.data.images.load(processed_image_path)
         tex_image_node.interpolation = 'Linear'
 
-        # Connect the texture's color and alpha channels to the material's shader
+        # Add a ColorRamp node between the texture and BSDF
+        color_ramp_node = material.node_tree.nodes.new("ShaderNodeValToRGB")
+
+        # Position nodes for better visual organization in the node editor
+        tex_image_node.location = (-600, 300)
+        color_ramp_node.location = (-300, 300)
+        bsdf.location = (0, 300)
+
+        # Connect the texture's color output to the ColorRamp node input
+        material.node_tree.links.new(color_ramp_node.inputs['Fac'], tex_image_node.outputs['Alpha'])
+
+        # Connect the ColorRamp output to the Base Color input of the Principled BSDF
+        material.node_tree.links.new(bsdf.inputs['Alpha'], color_ramp_node.outputs['Color'])
+
+        # Connect the texture's alpha output to the BSDF's alpha input
         material.node_tree.links.new(bsdf.inputs['Base Color'], tex_image_node.outputs['Color'])
-        material.node_tree.links.new(bsdf.inputs['Alpha'], tex_image_node.outputs['Alpha'])
+
+        # Adjust ColorRamp black and white stops
+        color_ramp_node.color_ramp.elements[0].position = 0.4  # Move black point to 40%
+        color_ramp_node.color_ramp.elements[0].color = (0, 0, 0, 1)  # Ensure black is fully black
+
+        color_ramp_node.color_ramp.elements[1].position = 0.8  # Move white point to 80%
+        color_ramp_node.color_ramp.elements[1].color = (1, 1, 1, 1)  # Ensure white is fully white
+
+
+#        # Create a new material with transparency support
+#        material = bpy.data.materials.new(name="ImageMaterial")
+#        material.use_nodes = True
+#        bsdf = material.node_tree.nodes.get("Principled BSDF")
+#        bsdf.inputs[12].default_value = 0
+
+#        # Load the image into the material's base color and alpha inputs
+#        tex_image_node = material.node_tree.nodes.new("ShaderNodeTexImage")
+#        tex_image_node.image = bpy.data.images.load(processed_image_path)
+#        tex_image_node.interpolation = 'Linear'
+
+#        # Connect the texture's color and alpha channels to the material's shader
+#        material.node_tree.links.new(bsdf.inputs['Base Color'], tex_image_node.outputs['Color'])
+#        material.node_tree.links.new(bsdf.inputs['Alpha'], tex_image_node.outputs['Alpha'])
 
         # Enable transparency in the material
-        material.blend_method = 'BLEND'
-        material.shadow_method = 'HASHED'
+        material.blend_method = 'HASHED'#'BLEND'
+        material.shadow_method = 'OPAQUE'
+        material.surface_render_method = 'DITHERED'
+        
+        #obj = bpy.ops.image.import_as_mesh_planes(filepath=transparent_image_path, files=[{"name":os.path.basename(transparent_image_path), "name":os.path.basename(transparent_image_path)}], directory=os.path.dirname(transparent_image_path))
 
         # Create a plane to hold the image
-        bpy.ops.mesh.primitive_plane_add(size=1)
+        bpy.ops.mesh.primitive_plane_add(size=1, location=bpy.context.scene.cursor.location)
         obj = bpy.context.object
 
         # Set the name for the new plane
@@ -359,6 +533,9 @@ class FLUX_OT_GenerateCharacter(bpy.types.Operator):
             obj.data.materials[0] = material
         else:
             obj.data.materials.append(material)
+            
+        #obj.active_material.surface_render_method = 'BLENDED'
+
 
         # Adjust the plane's size to match the image aspect ratio
         img_width, img_height = processed_image.size
@@ -381,9 +558,9 @@ class FLUX_OT_GenerateCharacter(bpy.types.Operator):
             bpy.ops.ed.lib_id_load_custom_preview(filepath=transparent_image_path)
 
         # Set asset metadata
-        obj.asset_data.author = "2D People Add-on"
+        obj.asset_data.author = "2D Asset Generator"
         obj.asset_data.description = prompt  # f"Generated from: {os.path.basename(transparent_image_path)}"
-        obj.asset_data.tags.new(name="GeneratedCharacter")
+        obj.asset_data.tags.new(name="GeneratedAsset")
 
         # Save the .blend file so that the asset is persistent
         bpy.ops.wm.save_mainfile()
@@ -393,15 +570,15 @@ class FLUX_OT_GenerateCharacter(bpy.types.Operator):
         self.report({'INFO'}, "3D object created and added to the asset library")
 
 
-# UI Panel for Character Generation and Setup
-class FLUX_PT_GenerateCharacterPanel(bpy.types.Panel):
+# UI Panel for Asset Generation and Setup
+class FLUX_PT_GenerateAssetPanel(bpy.types.Panel):
     """Creates a Panel in the 3D View for the FLUX character generator"""
 
-    bl_label = "2D People Generator"
-    bl_idname = "VIEW3D_PT_generate_character"
+    bl_label = "2D Asset Generator"
+    bl_idname = "VIEW3D_PT_generate_asset"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
-    bl_category = '2D People'
+    bl_category = '2D Asset'
 
     def draw(self, context):
         layout = self.layout
@@ -411,20 +588,20 @@ class FLUX_PT_GenerateCharacterPanel(bpy.types.Panel):
         layout.operator("object.setup_flux_env", text="Set up Environment")
 
         # Button to generate the character
-        layout.prop(scene, "character_description", text="Prompt")
+        layout.prop(scene, "asset_prompt", text="Prompt")
         layout.prop(context.scene, "asset_name", text="Name")
-        layout.operator("object.generate_character", text="Generate")
+        layout.operator("object.generate_asset", text="Generate")
 
 
 # Registering the add-on and properties
 def register():
     bpy.utils.register_class(FLUX_OT_SetupEnvironment)
-    bpy.utils.register_class(FLUX_OT_GenerateCharacter)
-    bpy.utils.register_class(FLUX_PT_GenerateCharacterPanel)
+    bpy.utils.register_class(FLUX_OT_GenerateAsset)
+    bpy.utils.register_class(FLUX_PT_GenerateAssetPanel)
 
-    # Register the character_description as a scene property
-    bpy.types.Scene.character_description = bpy.props.StringProperty(
-        name="Character Description", description="Describe the character to generate", default=""
+    # Register the asset_prompt as a scene property
+    bpy.types.Scene.asset_prompt = bpy.props.StringProperty(
+        name="Asset Description", description="Describe the asset to generate", default=""
     )
     bpy.types.Scene.asset_name = bpy.props.StringProperty(  # Add asset name property
         name="Asset Name",
@@ -438,11 +615,11 @@ def unregister():
 
     # Unregister classes
     bpy.utils.unregister_class(FLUX_OT_SetupEnvironment)
-    bpy.utils.unregister_class(FLUX_OT_GenerateCharacter)
-    bpy.utils.unregister_class(FLUX_PT_GenerateCharacterPanel)
+    bpy.utils.unregister_class(FLUX_OT_GenerateAsset)
+    bpy.utils.unregister_class(FLUX_PT_GenerateAssetPanel)
 
-    # Remove the character_description property
-    del bpy.types.Scene.character_description
+    # Remove the asset_prompt property
+    del bpy.types.Scene.asset_prompt
     del bpy.types.Scene.asset_name
 
 
