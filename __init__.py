@@ -468,6 +468,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         material.use_nodes = True
         bsdf = material.node_tree.nodes.get("Principled BSDF")
         bsdf.inputs[12].default_value = 0  # Set Alpha to 0 for transparency
+        bsdf.inputs['IOR'].default_value = 1.0  # Minimum effective IOR for transparency
 
         # Load the image into the material's base color and alpha inputs
         tex_image_node = material.node_tree.nodes.new("ShaderNodeTexImage")
@@ -478,9 +479,9 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         color_ramp_node = material.node_tree.nodes.new("ShaderNodeValToRGB")
 
         # Position nodes for better visual organization in the node editor
-        tex_image_node.location = (-600, 300)
-        color_ramp_node.location = (-300, 300)
-        bsdf.location = (0, 300)
+        tex_image_node.location = (-900, 300)
+        color_ramp_node.location = (-600, 300)
+        bsdf.location = (-300, 300)
 
         # Connect the texture's color output to the ColorRamp node input
         material.node_tree.links.new(color_ramp_node.inputs['Fac'], tex_image_node.outputs['Alpha'])
@@ -492,10 +493,10 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         material.node_tree.links.new(bsdf.inputs['Base Color'], tex_image_node.outputs['Color'])
 
         # Adjust ColorRamp black and white stops
-        color_ramp_node.color_ramp.elements[0].position = 0.4  # Move black point to 40%
+        color_ramp_node.color_ramp.elements[0].position = 0.75  # Move black point to 75%
         color_ramp_node.color_ramp.elements[0].color = (0, 0, 0, 1)  # Ensure black is fully black
 
-        color_ramp_node.color_ramp.elements[1].position = 0.8  # Move white point to 80%
+        color_ramp_node.color_ramp.elements[1].position = 0.95  # Move white point to 95%
         color_ramp_node.color_ramp.elements[1].color = (1, 1, 1, 1)  # Ensure white is fully white
 
 
