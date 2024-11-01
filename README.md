@@ -1,4 +1,4 @@
-<h1 align="center">2D Assets</h1>
+<h1 align="center">2D Asset Generator</h1>
 
 <p align="center">Blender add-on for AI generating 2D cutout assets for ex. previz, using FLUX and BiRefNet</p>
 
