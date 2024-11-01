@@ -332,7 +332,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         pipe.enable_model_cpu_offload()
 
         # Generate the image
-        prompt = "wide-shot, full body shot, neutral background, " + description
+        prompt = ", neutral background, " + description
         out = pipe(
             prompt=prompt,
             guidance_scale=3.8,
