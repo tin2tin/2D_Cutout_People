@@ -56,13 +56,17 @@ That's it! Your add-on should now be installed and ready to use in Blender.
 ## Other Software
 Try also Pallaidium - a genAI Movie Studio for free: https://github.com/tin2tin/Pallaidium
 
-## Dependencies:
+## Dependencies & License:
 
 https://github.com/huggingface/diffusers
 
 https://huggingface.co/ZhengPeng7/BiRefNet
 
 https://huggingface.co/black-forest-labs/FLUX.1-dev
+
+https://github.com/bitsandbytes-foundation/bitsandbytes
+
+https://pytorch.org/
 
 
 
