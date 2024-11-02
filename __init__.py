@@ -1,14 +1,16 @@
 bl_info = {
-    "name": "2D Asset Generator with FLUX",
+    "name": "2D Asset Generator",
     "author": "tintwotin",
     "version": (1, 0),
     "blender": (3, 0, 0),
     "category": "3D View",
     "location": "3D Editor > Sidebar > 2D Asset",
-    "description": "AI Generate media in the VSE",
+    "description": "2D Asset Generator in the 3D View",
 }
 
 import bpy
+from bpy.types import Operator, PropertyGroup, Panel
+from bpy.props import StringProperty, EnumProperty
 import os, re
 import subprocess
 import sys
@@ -32,6 +34,37 @@ def flush():
 
 def python_exec():
     return sys.executable
+
+
+# Get a list of text blocks in Blender
+def texts(self, context):
+    return [(text.name, text.name, "") for text in bpy.data.texts]
+
+
+# Property Group for storing the selected text block and toggle
+class Import_Text_Props(PropertyGroup):
+    def update_text_list(self, context):
+        self.script = bpy.data.texts[self.scene_texts].name
+        return None
+
+    # EnumProperty to toggle between Text-Block and Prompt
+    input_type: EnumProperty(
+        name="Input Type",
+        description="Choose between Text-Block and Prompt",
+        items=[
+            ('PROMPT', "Prompt", "Use Prompt"),
+            ('TEXT_BLOCK', "Text-Block", "Use Text Block"),
+        ],
+        default='TEXT_BLOCK',
+    )
+
+    script: StringProperty(default="", description="Browse Text to be Linked")
+    scene_texts: EnumProperty(
+        name="Text-Blocks",
+        items=texts,
+        update=update_text_list,
+        description="Text-Blocks",
+    )
 
 
 class FLUX_OT_SetupEnvironment(bpy.types.Operator):
@@ -119,40 +152,6 @@ class FLUX_OT_SetupEnvironment(bpy.types.Operator):
         self.report({"INFO"}, "\nDependencies installed successfully.")
 
 
-# def get_unique_asset_name(self, context):
-#    """Generates a unique asset name if there is a conflict."""
-#    base_name = context.scene.asset_name
-#    if base_name == "" or base_name == None:
-#        prompt = context.scene.asset_prompt
-#        words = s.split()
-#        base_name = words[:2]
-#        if base_name == "" or base_name == None:
-#            base_name = "Asset"
-#        context.scene.asset_name = base_name
-#    existing_names = {obj.name for obj in bpy.data.objects if obj.asset_data}
-
-#    # If no conflict, return the original name
-#    if base_name not in existing_names:
-#        return base_name
-#    # Regular expression to detect if the name has a number in parentheses
-#    match = re.search(r"\((\d+)\)$", base_name)
-
-#    if match:
-#        # If there's a number, increment it
-#        base_name = base_name[: match.start()].strip()
-#        counter = int(match.group(1)) + 1
-#    else:
-#        # If no number, start at 1
-#        counter = 1
-#    unique_name = f"{base_name} ({counter})"
-#    while unique_name in existing_names:
-#        counter += 1
-#        unique_name = f"{base_name} ({counter})"
-#    context.scene.asset_name = unique_name
-
-#    return unique_name
-
-
 def get_unique_asset_name(self, context):
     """Generates a unique asset name if there is a conflict, ensuring a name is always returned."""
 
@@ -220,24 +219,41 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
     def execute(self, context):
         try:
-            # Fetch the character description from the scene
-            description = context.scene.asset_prompt
 
-            # Ensure the description is not empty
-            if not description:
-                self.report({"ERROR"}, "Asset description is empty.")
-                return {"CANCELLED"}
+            input_type = context.scene.import_text.input_type
 
-            # Generate image using FLUX
-            image_path = bpy.path.abspath(self.generate_image(context, description))
-            print(image_path)
+            if input_type == 'TEXT_BLOCK':
+                # text = bpy.data.texts[import_text.scene_texts]
+                text = bpy.data.texts[context.scene.import_text.scene_texts]
+                lines = [line.body for line in text.lines]
+                lines = [line for line in lines if line.strip()]
+            elif input_type == 'PROMPT':
+                lines = [context.scene.asset_prompt]
 
-            # Remove background from the generated image
-            transparent_image_path = bpy.path.abspath(self.remove_background(context, image_path))
-            print(transparent_image_path)
+            for index, line in enumerate(lines):
+                if line:
+                    # Fetch the character description from the scene
+                    context.scene.asset_prompt = line
+                    base_name = " ".join(line.split()[:3]) if line else "Asset"
+                    context.scene.asset_name = base_name.title()
+                    description = context.scene.asset_prompt
+                    print(str(index + 1) + "/" + str(len(lines)) + ": " + base_name.title())
 
-            # Convert the transparent image to a 3D object
-            self.convert_to_3d(context, transparent_image_path, description)
+                    # Ensure the description is not empty
+                    if not description:
+                        self.report({"ERROR"}, "Asset description is empty.")
+                        return {"CANCELLED"}
+
+                    # Generate image using FLUX
+                    image_path = bpy.path.abspath(self.generate_image(context, description))
+                    print(image_path)
+
+                    # Remove background from the generated image
+                    transparent_image_path = bpy.path.abspath(self.remove_background(context, image_path))
+                    print(transparent_image_path)
+
+                    # Convert the transparent image to a 3D object
+                    self.convert_to_3d(context, transparent_image_path, description)
 
             return {"FINISHED"}
         except Exception as e:
@@ -306,9 +322,8 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         import torch
 
         asset_name = context.scene.asset_name
-
+        # If bitsandbytes doesn't work, use this:
         #        pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
-
         #        pipe.enable_sequential_cpu_offload()
         #        pipe.enable_vae_slicing()
         #        pipe.vae.enable_tiling()
@@ -332,7 +347,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         pipe.enable_model_cpu_offload()
 
         # Generate the image
-        prompt = ", neutral background, " + description
+        prompt = "neutral background, " + description
         out = pipe(
             prompt=prompt,
             guidance_scale=3.8,
@@ -605,6 +620,9 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         )
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
+        # Avoid deleting the asset when deleting the object
+        obj.data.use_fake_user = True
+
         # Mark the object as an asset
         obj.asset_mark()
 
@@ -637,21 +655,45 @@ class FLUX_PT_GenerateAssetPanel(bpy.types.Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
+        import_text = scene.import_text
 
-        # Button to install dependencies
-        layout.operator("object.setup_flux_env", text="Set up Environment")
+        layout = layout.box()
+        layout.operator("object.generate_asset", text="Generate")
+
+        # Toggle between Text-Block and Prompt as an expandable row
+        row = layout.row()
+        row.prop(import_text, "input_type", expand=True)
+
+        # Show Text-Block selector if 'TEXT_BLOCK' is selected, otherwise show the prompt input
+        if import_text.input_type == 'TEXT_BLOCK':
+            row = layout.row(align=True)
+            row.prop(import_text, "scene_texts", text="", icon="TEXT", icon_only=True)
+            row.prop(import_text, "script", text="")
+        else:
+            layout.prop(scene, "asset_prompt", text="Prompt")
 
         # Button to generate the character
-        layout.prop(scene, "asset_prompt", text="Prompt")
         layout.prop(context.scene, "asset_name", text="Name")
-        layout.operator("object.generate_asset", text="Generate")
+
+        # Button to install dependencies
+        layout = self.layout
+        layout.operator("object.setup_flux_env", text="Set-up Dependencies")
+
+
+# Register and Unregister classes and properties
+classes = (
+    Import_Text_Props,
+    FLUX_OT_SetupEnvironment,
+    FLUX_OT_GenerateAsset,
+    FLUX_PT_GenerateAssetPanel,
+)
 
 
 # Registering the add-on and properties
 def register():
-    bpy.utils.register_class(FLUX_OT_SetupEnvironment)
-    bpy.utils.register_class(FLUX_OT_GenerateAsset)
-    bpy.utils.register_class(FLUX_PT_GenerateAssetPanel)
+    for cls in classes:
+        bpy.utils.register_class(cls)
+    bpy.types.Scene.import_text = bpy.props.PointerProperty(type=Import_Text_Props)
 
     # Register the asset_prompt as a scene property
     bpy.types.Scene.asset_prompt = bpy.props.StringProperty(
@@ -668,11 +710,9 @@ def register():
 
 
 def unregister():
-
-    # Unregister classes
-    bpy.utils.unregister_class(FLUX_OT_SetupEnvironment)
-    bpy.utils.unregister_class(FLUX_OT_GenerateAsset)
-    bpy.utils.unregister_class(FLUX_PT_GenerateAssetPanel)
+    del bpy.types.Scene.import_text
+    for cls in classes:
+        bpy.utils.unregister_class(cls)
 
     # Remove the asset_prompt property
     del bpy.types.Scene.asset_prompt
