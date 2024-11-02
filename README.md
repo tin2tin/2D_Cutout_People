@@ -53,6 +53,9 @@ To install an add-on in Blender, follow these simple steps:
 
 That's it! Your add-on should now be installed and ready to use in Blender.
 
+![image](https://github.com/user-attachments/assets/c1b3086c-5898-4603-ad4f-4031a5653489)
+
+
 ## Other Software
 Try also Pallaidium - a genAI Movie Studio for free: https://github.com/tin2tin/Pallaidium
 
