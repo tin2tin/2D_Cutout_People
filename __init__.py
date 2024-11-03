@@ -17,6 +17,8 @@ import sys
 from PIL import Image, ImageFilter
 import math
 from os.path import join
+from mathutils import Vector
+
 
 dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D Assets")
 os.makedirs(dir_path, exist_ok=True)
@@ -351,8 +353,8 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         out = pipe(
             prompt=prompt,
             guidance_scale=3.8,
-            height=768,
-            width=1360,
+            height=1024,
+            width=1024,
             num_inference_steps=25,
             max_sequence_length=256,
         ).images[0]
@@ -620,6 +622,12 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         )
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
+        # Set origin point
+        #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+        bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+
+        bpy.context.view_layer.objects.active = obj
+        
         # Avoid deleting the asset when deleting the object
         obj.data.use_fake_user = True
 
