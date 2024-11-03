@@ -11,6 +11,13 @@
 
 https://github.com/user-attachments/assets/6cce7ca7-7817-4406-b6c4-6d4e8c414ed4
 
+## Requirements
+- Windows (Unsupported: Linux and MacOS).
+- A CUDA-supported Nvidia card with at least 6 GB VRAM.
+- CUDA: 12.4
+- 20+ GB HDD. (Each model is 6+ GB).
+
+
 ## Installation
 
 To install an add-on in Blender, follow these simple steps:
