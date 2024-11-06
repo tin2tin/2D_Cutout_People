@@ -221,7 +221,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
     def execute(self, context):
         try:
-
+            pipe = self.load_model(context)
             input_type = context.scene.import_text.input_type
 
             if input_type == 'TEXT_BLOCK':
@@ -247,7 +247,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
                         return {"CANCELLED"}
 
                     # Generate image using FLUX
-                    image_path = bpy.path.abspath(self.generate_image(context, description))
+                    image_path = bpy.path.abspath(self.generate_image(context, description, pipe))
                     print(image_path)
 
                     # Remove background from the generated image
@@ -256,74 +256,77 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
                     # Convert the transparent image to a 3D object
                     self.convert_to_3d(context, transparent_image_path, description)
-
+            flush()
             return {"FINISHED"}
         except Exception as e:
             self.report({"ERROR"}, f"Error: {str(e)}")
             return {"CANCELLED"}
 
-    #    #SD 3.5 Medium
-    #    def generate_image(self, context, description):
-    #        """Generates an image using the Stable Diffusion 3 model based on user input."""
+#    #SD 3.5 Medium
+#    def generate_image(self, context, description):
+#        """Generates an image using the Stable Diffusion 3 model based on user input."""
 
-    #        # Import dependencies inside the method to avoid potential module issues before installation
-    #        from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel
-    #        import torch
+#        # Import dependencies inside the method to avoid potential module issues before installation
+#        from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel
+#        import torch
 
-    #        # Define model configuration and ID
-    #        model_id = "stabilityai/stable-diffusion-3.5-medium"
-    #        asset_name = context.scene.asset_name
+#        # Define model configuration and ID
+#        model_id = "stabilityai/stable-diffusion-3.5-medium"
+#        asset_name = context.scene.asset_name
 
-    #        # Configure quantization settings for 4-bit loading
-    #        nf4_config = BitsAndBytesConfig(
-    #            load_in_4bit=True,
-    #            bnb_4bit_quant_type="nf4",
-    #            bnb_4bit_compute_dtype=torch.bfloat16
-    #        )
+#        # Configure quantization settings for 4-bit loading
+#        nf4_config = BitsAndBytesConfig(
+#            load_in_4bit=True,
+#            bnb_4bit_quant_type="nf4",
+#            bnb_4bit_compute_dtype=torch.bfloat16
+#        )
 
-    #        # Initialize the transformer model with quantization settings
-    #        model_nf4 = SD3Transformer2DModel.from_pretrained(
-    #            model_id,
-    #            subfolder="transformer",
-    #            quantization_config=nf4_config,
-    #            torch_dtype=torch.bfloat16
-    #        )
+#        # Initialize the transformer model with quantization settings
+#        model_nf4 = SD3Transformer2DModel.from_pretrained(
+#            model_id,
+#            subfolder="transformer",
+#            quantization_config=nf4_config,
+#            torch_dtype=torch.bfloat16
+#        )
 
-    #        # Load the Stable Diffusion pipeline with the transformer model
-    #        pipeline = StableDiffusion3Pipeline.from_pretrained(
-    #            model_id,
-    #            transformer=model_nf4,
-    #            torch_dtype=torch.bfloat16
-    #        )
+#        # Load the Stable Diffusion pipeline with the transformer model
+#        pipeline = StableDiffusion3Pipeline.from_pretrained(
+#            model_id,
+#            transformer=model_nf4,
+#            torch_dtype=torch.bfloat16
+#        )
 
-    #        # Enable CPU offloading for memory optimization
-    #        pipeline.enable_model_cpu_offload()
+#        # Enable CPU offloading for memory optimization
+#        pipeline.enable_model_cpu_offload()
 
-    #        # Construct the prompt and generate the image
-    #        prompt = "neutral background, " + description
-    #        out = pipeline(
-    #            prompt=prompt,
-    #            guidance_scale=2.8,
-    #            height=1440,
-    #            width=1440,
-    #            num_inference_steps=30,
-    #            max_sequence_length=256,
-    #        ).images[0]
+#        # Construct the prompt and generate the image
+#        prompt = "neutral background, " + description
+#        out = pipeline(
+#            prompt=prompt,
+#            guidance_scale=2.8,
+#            height=1440,
+#            width=1440,
+#            num_inference_steps=30,
+#            max_sequence_length=256,
+#        ).images[0]
 
-    #        # Save the generated image to the specified path
-    #        image_path = bpy.path.abspath(f"//{asset_name}_generated_image.png")
-    #        out.save(image_path)
-    #        return image_path
+#        # Save the generated image to the specified path
+#        asset_name = re.sub(r'[<>:"/\\|?*]', '', context.scene.asset_name)
+#        image_path = bpy.path.abspath(f"//{asset_name}_generated_image.png")
+#        out.save(image_path)
+#        flush()
+#        return image_path
+
 
     # FLUX
-    def generate_image(self, context, description):
+    def load_model(self, context):
         """Generates an image using the FLUX model based on the user input."""
 
         # Import dependencies inside the method to avoid potential module issues before installation
         from diffusers import FluxPipeline
         import torch
 
-        asset_name = context.scene.asset_name
+        #asset_name = context.scene.asset_name
         # If bitsandbytes doesn't work, use this:
         #        pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
         #        pipe.enable_sequential_cpu_offload()
@@ -347,6 +350,13 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
         pipe.enable_model_cpu_offload()
+        return pipe
+
+    # FLUX
+    def generate_image(self, context, description, pipe):
+        """Generates an image using the FLUX model based on the user input."""
+
+        asset_name = context.scene.asset_name
 
         # Generate the image
         prompt = "neutral background, " + description
@@ -360,11 +370,12 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         ).images[0]
 
         # Save the generated image
+        asset_name = re.sub(r'[<>:"/\\|?*]', '', context.scene.asset_name)
         image_path = bpy.path.abspath(
             join(
                 bpy.utils.user_resource("DATAFILES"),
                 "2D Assets",
-                f"{context.scene.asset_name}_generated_image.png",
+                f"{asset_name}_generated_image.png",
             )
         )
         out.save(image_path)
@@ -408,11 +419,12 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         # Apply the refined mask to the image to remove the background
         image.putalpha(refined_mask)
+        asset_name = re.sub(r'[<>:"/\\|?*]', '', context.scene.asset_name)
         transparent_image_path = bpy.path.abspath(
             join(
                 bpy.utils.user_resource("DATAFILES"),
                 "2D Assets",
-                f"{context.scene.asset_name}_generated_image_transparent.png",
+                f"{asset_name}_generated_image_transparent.png",
             )
         )  # Use asset name
         image.save(transparent_image_path)
@@ -513,7 +525,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         # Create a mask and crop the image to non-transparent areas
         processed_image = self.process_image(image)
-
+        asset_name = re.sub(r'[<>:"/\\|?*]', '', asset_name)
         # Save the cropped image
         processed_image_path = bpy.path.abspath(
             os.path.join(
@@ -665,8 +677,11 @@ class FLUX_PT_GenerateAssetPanel(bpy.types.Panel):
         scene = context.scene
         import_text = scene.import_text
 
+        # Button to install dependencies
+        layout = self.layout
+        layout.operator("object.setup_flux_env", text="Set-up Dependencies")
+
         layout = layout.box()
-        layout.operator("object.generate_asset", text="Generate")
 
         # Toggle between Text-Block and Prompt as an expandable row
         row = layout.row()
@@ -682,10 +697,8 @@ class FLUX_PT_GenerateAssetPanel(bpy.types.Panel):
 
         # Button to generate the character
         layout.prop(context.scene, "asset_name", text="Name")
-
-        # Button to install dependencies
-        layout = self.layout
-        layout.operator("object.setup_flux_env", text="Set-up Dependencies")
+        
+        layout.operator("object.generate_asset", text="Generate")        
 
 
 # Register and Unregister classes and properties
