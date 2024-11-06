@@ -19,6 +19,8 @@ import math
 from os.path import join
 from mathutils import Vector
 
+DEBUG = False
+
 
 dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D Assets")
 os.makedirs(dir_path, exist_ok=True)
@@ -54,10 +56,10 @@ class Import_Text_Props(PropertyGroup):
         name="Input Type",
         description="Choose between Text-Block and Prompt",
         items=[
-            ('PROMPT', "Prompt", "Use Prompt"),
-            ('TEXT_BLOCK', "Text-Block", "Use Text Block"),
+            ("PROMPT", "Prompt", "Input: Typed in prompt"),
+            ("TEXT_BLOCK", "Text-Block", "Input: Text from the Blender Text Editor"),
         ],
-        default='TEXT_BLOCK',
+        default="TEXT_BLOCK",
     )
 
     script: StringProperty(default="", description="Browse Text to be Linked")
@@ -187,6 +189,7 @@ def get_unique_asset_name(self, context):
         unique_name = f"{base_name} ({counter})"
 
     # Set the unique name in the context and return it
+    unique_name = get_unique_file_name(unique_name)
     context.scene.asset_name = unique_name
     return
 
@@ -224,99 +227,115 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
             pipe = self.load_model(context)
             input_type = context.scene.import_text.input_type
 
-            if input_type == 'TEXT_BLOCK':
+            if input_type == "TEXT_BLOCK":
                 # text = bpy.data.texts[import_text.scene_texts]
                 text = bpy.data.texts[context.scene.import_text.scene_texts]
                 lines = [line.body for line in text.lines]
                 lines = [line for line in lines if line.strip()]
-            elif input_type == 'PROMPT':
+            elif input_type == "PROMPT":
                 lines = [context.scene.asset_prompt]
 
             for index, line in enumerate(lines):
                 if line:
-                    # Fetch the character description from the scene
+                    # Fetch the prompt from the scene
                     context.scene.asset_prompt = line
                     base_name = " ".join(line.split()[:3]) if line else "Asset"
                     context.scene.asset_name = base_name.title()
                     description = context.scene.asset_prompt
                     print(str(index + 1) + "/" + str(len(lines)) + ": " + base_name.title())
 
-                    # Ensure the description is not empty
                     if not description:
-                        self.report({"ERROR"}, "Asset description is empty.")
+                        self.report({"ERROR"}, "Asset prompt is empty.")
                         return {"CANCELLED"}
 
                     # Generate image using FLUX
                     image_path = bpy.path.abspath(self.generate_image(context, description, pipe))
-                    print(image_path)
+                    if DEBUG:
+                        print(f"Image Path: {image_path}")
 
                     # Remove background from the generated image
                     transparent_image_path = bpy.path.abspath(self.remove_background(context, image_path))
-                    print(transparent_image_path)
+                    if DEBUG:
+                        print(f"Transparent Path: {transparent_image_path}")
 
-                    # Convert the transparent image to a 3D object
-                    self.convert_to_3d(context, transparent_image_path, description)
+                    # separate islands
+                    image_paths = self.split_by_alpha_islands(transparent_image_path, output_prefix=base_name)
+                    if DEBUG:
+                        print(f"Image Paths: {image_paths}")
+                    if image_paths:
+                        # Iterating through the saved images
+                        for path in image_paths:
+                            with Image.open(path) as img:
+                                # Convert the transparent image to a 3D object
+                                self.convert_to_3d(context, path, description)
+                                # Example of additional processing could go here
+                                if DEBUG:
+                                    print(f"Converting to asset: {path}")
+                    else:
+                        if DEBUG:
+                            print("No valid content generated.")
             flush()
+            # Save the .blend file so that the asset is persistent
+            bpy.ops.wm.save_mainfile()
             return {"FINISHED"}
         except Exception as e:
             self.report({"ERROR"}, f"Error: {str(e)}")
             return {"CANCELLED"}
 
-#    #SD 3.5 Medium
-#    def generate_image(self, context, description):
-#        """Generates an image using the Stable Diffusion 3 model based on user input."""
+    #    #SD 3.5 Medium
+    #    def generate_image(self, context, description):
+    #        """Generates an image using the Stable Diffusion 3 model based on user input."""
 
-#        # Import dependencies inside the method to avoid potential module issues before installation
-#        from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel
-#        import torch
+    #        # Import dependencies inside the method to avoid potential module issues before installation
+    #        from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel
+    #        import torch
 
-#        # Define model configuration and ID
-#        model_id = "stabilityai/stable-diffusion-3.5-medium"
-#        asset_name = context.scene.asset_name
+    #        # Define model configuration and ID
+    #        model_id = "stabilityai/stable-diffusion-3.5-medium"
+    #        asset_name = context.scene.asset_name
 
-#        # Configure quantization settings for 4-bit loading
-#        nf4_config = BitsAndBytesConfig(
-#            load_in_4bit=True,
-#            bnb_4bit_quant_type="nf4",
-#            bnb_4bit_compute_dtype=torch.bfloat16
-#        )
+    #        # Configure quantization settings for 4-bit loading
+    #        nf4_config = BitsAndBytesConfig(
+    #            load_in_4bit=True,
+    #            bnb_4bit_quant_type="nf4",
+    #            bnb_4bit_compute_dtype=torch.bfloat16
+    #        )
 
-#        # Initialize the transformer model with quantization settings
-#        model_nf4 = SD3Transformer2DModel.from_pretrained(
-#            model_id,
-#            subfolder="transformer",
-#            quantization_config=nf4_config,
-#            torch_dtype=torch.bfloat16
-#        )
+    #        # Initialize the transformer model with quantization settings
+    #        model_nf4 = SD3Transformer2DModel.from_pretrained(
+    #            model_id,
+    #            subfolder="transformer",
+    #            quantization_config=nf4_config,
+    #            torch_dtype=torch.bfloat16
+    #        )
 
-#        # Load the Stable Diffusion pipeline with the transformer model
-#        pipeline = StableDiffusion3Pipeline.from_pretrained(
-#            model_id,
-#            transformer=model_nf4,
-#            torch_dtype=torch.bfloat16
-#        )
+    #        # Load the Stable Diffusion pipeline with the transformer model
+    #        pipeline = StableDiffusion3Pipeline.from_pretrained(
+    #            model_id,
+    #            transformer=model_nf4,
+    #            torch_dtype=torch.bfloat16
+    #        )
 
-#        # Enable CPU offloading for memory optimization
-#        pipeline.enable_model_cpu_offload()
+    #        # Enable CPU offloading for memory optimization
+    #        pipeline.enable_model_cpu_offload()
 
-#        # Construct the prompt and generate the image
-#        prompt = "neutral background, " + description
-#        out = pipeline(
-#            prompt=prompt,
-#            guidance_scale=2.8,
-#            height=1440,
-#            width=1440,
-#            num_inference_steps=30,
-#            max_sequence_length=256,
-#        ).images[0]
+    #        # Construct the prompt and generate the image
+    #        prompt = "neutral background, " + description
+    #        out = pipeline(
+    #            prompt=prompt,
+    #            guidance_scale=2.8,
+    #            height=1440,
+    #            width=1440,
+    #            num_inference_steps=30,
+    #            max_sequence_length=256,
+    #        ).images[0]
 
-#        # Save the generated image to the specified path
-#        asset_name = re.sub(r'[<>:"/\\|?*]', '', context.scene.asset_name)
-#        image_path = bpy.path.abspath(f"//{asset_name}_generated_image.png")
-#        out.save(image_path)
-#        flush()
-#        return image_path
-
+    #        # Save the generated image to the specified path
+    #        asset_name = re.sub(r'[<>:"/\\|?*]', '', context.scene.asset_name)
+    #        image_path = bpy.path.abspath(f"//{asset_name}_generated_image.png")
+    #        out.save(image_path)
+    #        flush()
+    #        return image_path
 
     # FLUX
     def load_model(self, context):
@@ -326,7 +345,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         from diffusers import FluxPipeline
         import torch
 
-        #asset_name = context.scene.asset_name
+        # asset_name = context.scene.asset_name
         # If bitsandbytes doesn't work, use this:
         #        pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
         #        pipe.enable_sequential_cpu_offload()
@@ -370,7 +389,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         ).images[0]
 
         # Save the generated image
-        asset_name = re.sub(r'[<>:"/\\|?*]', '', context.scene.asset_name)
+        asset_name = re.sub(r'[<>:"/\\|?*]', "", context.scene.asset_name)
         image_path = bpy.path.abspath(
             join(
                 bpy.utils.user_resource("DATAFILES"),
@@ -419,7 +438,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         # Apply the refined mask to the image to remove the background
         image.putalpha(refined_mask)
-        asset_name = re.sub(r'[<>:"/\\|?*]', '', context.scene.asset_name)
+        asset_name = re.sub(r'[<>:"/\\|?*]', "", context.scene.asset_name)
         transparent_image_path = bpy.path.abspath(
             join(
                 bpy.utils.user_resource("DATAFILES"),
@@ -507,6 +526,41 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Crop the image to the bounding box
         return image.crop((left, top, right + 1, bottom + 1))
 
+    def split_by_alpha_islands(self, image_path, output_prefix):
+        from PIL import Image
+        import numpy as np
+        from scipy.ndimage import label, find_objects
+        import os
+
+        # Load the image and convert it to RGBA
+        img = Image.open(image_path).convert("RGBA")
+        img_data = np.array(img)
+
+        # Create a binary alpha mask (1 for opaque, 0 for transparent)
+        alpha_mask = img_data[:, :, 3] > 0  # True where pixel is non-transparent
+
+        # Label connected components in the alpha mask
+        labeled_array, num_features = label(alpha_mask)
+
+        # Prepare an array to store the file paths of saved images
+        saved_paths = []
+
+        # Iterate over each detected component (island of pixels)
+        for i, bbox in enumerate(find_objects(labeled_array), start=1):
+            if bbox is not None:
+                # Extract bounding box
+                character_img = img.crop((bbox[1].start, bbox[0].start, bbox[1].stop, bbox[0].stop))
+
+                # Generate the file path and save each cropped character instance
+                file_path = os.path.dirname(image_path) + f"{output_prefix}_{i}.png"
+                file_path = get_unique_file_name(file_path)
+                character_img.save(file_path)
+                saved_paths.append(file_path)
+                if DEBUG:
+                    print(f"Saved Asset part: {file_path}")
+
+        return saved_paths
+
     def convert_to_3d(self, context, transparent_image_path, prompt):
         """Converts an image with transparency into a 3D object (plane) and adds it to the asset library."""
         import os
@@ -525,7 +579,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         # Create a mask and crop the image to non-transparent areas
         processed_image = self.process_image(image)
-        asset_name = re.sub(r'[<>:"/\\|?*]', '', asset_name)
+        asset_name = re.sub(r'[<>:"/\\|?*]', "", asset_name)
         # Save the cropped image
         processed_image_path = bpy.path.abspath(
             os.path.join(
@@ -535,7 +589,8 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
             )
         )
         processed_image.save(processed_image_path)
-        print(processed_image_path)
+        if DEBUG:
+            print(processed_image_path)
 
         # Create a new material with transparency support
         material = bpy.data.materials.new(name="ImageMaterial")
@@ -635,11 +690,11 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
         # Set origin point
-        #bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
-        bpy.ops.object.origin_set(type='ORIGIN_CURSOR', center='MEDIAN')
+        # bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+        bpy.ops.object.origin_set(type="ORIGIN_CURSOR", center="MEDIAN")
 
         bpy.context.view_layer.objects.active = obj
-        
+
         # Avoid deleting the asset when deleting the object
         obj.data.use_fake_user = True
 
@@ -654,12 +709,10 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         obj.asset_data.description = prompt  # f"Generated from: {os.path.basename(transparent_image_path)}"
         obj.asset_data.tags.new(name="GeneratedAsset")
 
-        # Save the .blend file so that the asset is persistent
-        bpy.ops.wm.save_mainfile()
-
         get_unique_asset_name(self, context)
 
-        self.report({"INFO"}, "3D object created and added to the asset library")
+        if DEBUG:
+            self.report({"INFO"}, "3D object created and added to the asset library")
 
 
 # UI Panel for Asset Generation and Setup
@@ -688,17 +741,17 @@ class FLUX_PT_GenerateAssetPanel(bpy.types.Panel):
         row.prop(import_text, "input_type", expand=True)
 
         # Show Text-Block selector if 'TEXT_BLOCK' is selected, otherwise show the prompt input
-        if import_text.input_type == 'TEXT_BLOCK':
+        if import_text.input_type == "TEXT_BLOCK":
             row = layout.row(align=True)
             row.prop(import_text, "scene_texts", text="", icon="TEXT", icon_only=True)
             row.prop(import_text, "script", text="")
         else:
             layout.prop(scene, "asset_prompt", text="Prompt")
+            layout.prop(context.scene, "asset_name", text="Name")
 
         # Button to generate the character
-        layout.prop(context.scene, "asset_name", text="Name")
-        
-        layout.operator("object.generate_asset", text="Generate")        
+
+        layout.operator("object.generate_asset", text="Generate")
 
 
 # Register and Unregister classes and properties
