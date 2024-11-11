@@ -95,7 +95,6 @@ def import_module(module, install_module):
     try:
         subprocess.call([python_exe, "import ", packageName])
     except:
-        self.report({"INFO"}, "Installing: " + install_module + " module.")
         print("\nInstalling: " + module + " module")
         subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--no-dependencies", "--upgrade", '--target', target, "-q"])
 
