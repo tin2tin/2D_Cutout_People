@@ -20,7 +20,18 @@ from mathutils import Vector
 import venv
 import importlib
 from typing import Optional
+import platform
 
+try:
+    exec("import torch")
+    if torch.cuda.is_available():
+        gfx_device = "cuda"
+    elif torch.backends.mps.is_available():
+        gfx_device = "mps"
+    else:
+        gfx_device = "cpu"
+except:
+    print("2D Asset Generator dependencies needs to be installed and Blender needs to be restarted.")
 
 DEBUG = False
 
@@ -76,46 +87,144 @@ def ensure_pip_installed():
     debug_print("Ensured that pip is installed.")
 
 
-def install_packages(override: Optional[bool] = False):
+def import_module(module, install_module):
+    module = str(module)
+    python_exe = python_exec()
+    target = venv_path()
+
+    try:
+        subprocess.call([python_exe, "import ", packageName])
+    except:
+        self.report({"INFO"}, "Installing: " + install_module + " module.")
+        print("\nInstalling: " + module + " module")
+        subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--no-dependencies", "--upgrade", '--target', target, "-q"])
+
+        try:
+            exec("import " + module)
+        except ModuleNotFoundError:
+            return False
+    return True
+
+
+def install_packages(override: Optional[bool] = True):
     """Install or update packages from the requirements.txt file."""
     create_venv()  # Ensure the virtual environment exists before installation
-    
+    os_platform = platform.system()
     python_exe = python_exec()
     requirements_txt = os.path.join(addon_script_path(), "requirements.txt")
     target = venv_path()
-
+    
     # Ensure pip is installed
     ensure_pip_installed()
     
     # Upgrade pip
     subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', 'pip'])
-
+    
     # Install dependencies with or without override
     if override:
-        subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', '--force-reinstall', '-r', requirements_txt, '--target', target])
+        subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', '--force-reinstall', '-r', requirements_txt, '--target', target, "-q"])
     else:
-        subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', '-r', requirements_txt, '--target', target])
+        subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', '-r', requirements_txt, '--target', target, "-q"])
 
     # Add the virtual environment’s directory to sys.path
     add_virtualenv_to_syspath()
 
-    subprocess.check_call(
-        [
-            python_exe,
-            "-m",
-            "pip",
-            "install",
-            "torch==2.3.1+cu121",
-            "xformers",
-            "torchvision",
-            "--index-url",
-            "https://download.pytorch.org/whl/cu121",
-            "--no-warn-script-location",
-            "--upgrade",
-            '--target',
-            target,
-        ]
-    )
+    print("\nInstalling: torch module")
+    if os_platform == "Windows":
+#        subprocess.call([pybin, "-m", "pip", "install", "torch==2.1.2+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.2+cu121 xformers==2.1.2+cu121", "--index-url", "https://download.pytorch.org/whl/cu121", "--user", "--upgrade"])
+#        subprocess.check_call(
+#            [
+#                python_exe,
+#                "-m",
+#                "pip",
+#                "install",
+#                "torch==2.1.2+cu124",
+#                #"torch==2.1.2+cu118",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu124",
+#                #"https://download.pytorch.org/whl/cu118",
+#                #"https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                "--user",
+#                "-q",
+#                #"--upgrade",
+#            ]
+#        )
+#        subprocess.check_call(
+#            [
+#                python_exe,
+#                "-m",
+#                "pip",
+#                "install",
+#                #"torchvision==0.17.0+cu121",
+#                "torchvision==0.16.0+cu124",
+#                #"torchvision==0.16.0+cu118",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu124",
+#                #"https://download.pytorch.org/whl/cu118",
+#                #"https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                "--user",
+#                "-q",
+#                #"--upgrade",
+#            ]
+#        )
+##        subprocess.check_call(
+##            [
+##                pybin,
+##                "-m",
+##                "pip",
+##                "install",
+##                "xformers", #==0.0.23
+##                "--index-url",
+##                "https://download.pytorch.org/whl/cu118",
+##                #"https://download.pytorch.org/whl/cu121",
+##                "--no-warn-script-location",
+##                "--user",
+##                #"--upgrade",
+##            ]
+##        )
+#        subprocess.check_call(
+#            [
+#                python_exe,
+#                "-m",
+#                "pip",
+#                "install",
+#                "torchaudio==2.1.2+cu124",
+#                #"torchaudio==2.1.2+cu118",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu124",
+#                #"https://download.pytorch.org/whl/cu118",
+#                #"https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                "--user",
+#                "-q",
+#                #"--upgrade",
+#            ]
+#        )
+        subprocess.check_call(
+            [
+                python_exe,
+                "-m",
+                "pip",
+                "install",
+                "torch==2.3.1+cu121",
+                "xformers",
+                "torchvision",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu121",
+                "--no-warn-script-location",
+                "--upgrade",
+                '--target',
+                target,
+            ]
+        )
+    else:
+        import_module("torch", "torch")
+        import_module("torchvision", "torchvision")
+        import_module("torchaudio", "torchaudio")
+        import_module("xformers", "xformers")
+
 
     # Check if all dependencies are installed
     check_dependencies_installed()
@@ -234,11 +343,11 @@ class CheckDependenciesOperator(bpy.types.Operator):
 def flush():
     import torch
     import gc
-
     gc.collect()
-    torch.cuda.empty_cache()
-    torch.cuda.reset_max_memory_allocated()
-    # torch.cuda.reset_peak_memory_stats()
+    if gfx_device == "cuda":
+        torch.cuda.empty_cache()
+        torch.cuda.reset_max_memory_allocated()
+        # torch.cuda.reset_peak_memory_stats()
 
 
 def python_exec():
@@ -623,7 +732,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         asset_name = context.scene.asset_name
 
         birefnet = AutoModelForImageSegmentation.from_pretrained("ZhengPeng7/BiRefNet", trust_remote_code=True)
-        birefnet.to("cuda")
+        birefnet.to(gfx_device)
 
         transform_image = transforms.Compose(
             [
@@ -636,7 +745,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Load and transform the image
         image = Image.open(image_path).convert("RGB")
         image_size = image.size
-        input_image = transform_image(image).unsqueeze(0).to("cuda")
+        input_image = transform_image(image).unsqueeze(0).to(gfx_device)
 
         # Generate the background mask
         with torch.no_grad():
@@ -685,7 +794,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         from PIL import Image, ImageFilter
 
         birefnet = AutoModelForImageSegmentation.from_pretrained("ZhengPeng7/BiRefNet", trust_remote_code=True)
-        birefnet.to("cuda")
+        birefnet.to(gfx_device)
         image_size = image.size
         transform_image = transforms.Compose(
             [
@@ -694,7 +803,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
-        input_images = transform_image(image).unsqueeze(0).to("cuda")
+        input_images = transform_image(image).unsqueeze(0).to(gfx_device)
 
         # Prediction
         with torch.no_grad():
