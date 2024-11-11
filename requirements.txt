@@ -1,0 +1,9 @@
+diffusers
+pillow
+transformers
+bitsandbytes
+botocore
+ml-dtypes
+protobuf==3.20.1
+tqdm
+markupsafe
