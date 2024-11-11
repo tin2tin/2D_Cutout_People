@@ -62,6 +62,10 @@ That's it! Your add-on should now be installed and ready to use in Blender.
 
 ![image](https://github.com/user-attachments/assets/c1b3086c-5898-4603-ad4f-4031a5653489)
 
+This prompt will do a character sheet:
+A grid, the same woman, in different actions (standing, talking, sitting, running), different emotions (talking, looking, smiling, angry, sad), full body, neutral background, highly detailed.
+![image](https://github.com/user-attachments/assets/8f7b08cf-9661-4208-a41f-b2627bf32311)
+
 
 ## Other Software
 Try also Pallaidium - a genAI Movie Studio for free: https://github.com/tin2tin/Pallaidium
