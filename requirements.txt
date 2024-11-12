@@ -1,5 +1,5 @@
+chardet
 requests
-charset-normalizer
 diffusers
 bitsandbytes
 einops
@@ -16,3 +16,4 @@ psutil
 botocore
 ml-dtypes
 markupsafe
+protobuf==3.20.1
