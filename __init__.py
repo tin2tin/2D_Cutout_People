@@ -22,18 +22,21 @@ import importlib
 from typing import Optional
 import platform
 
-try:
-    exec("import torch")
-    if torch.cuda.is_available():
-        gfx_device = "cuda"
-    elif torch.backends.mps.is_available():
-        gfx_device = "mps"
-    else:
-        gfx_device = "cpu"
-except:
-    print("2D Asset Generator dependencies needs to be installed and Blender needs to be restarted.")
+def gfx_device():
+    try:
+        exec("import torch")
+        if torch.cuda.is_available():
+            gfxdevice = "cuda"
+        elif torch.backends.mps.is_available():
+            gfxdevice = "mps"
+        else:
+            gfxdevice = "cpu"
+    except:
+        print("2D Asset Generator dependencies needs to be installed and Blender needs to be restarted.")
+        gfxdevice = "cpu"
+    return gfxdevice
 
-DEBUG = False
+DEBUG = True
 
 
 dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D Assets")
@@ -83,7 +86,7 @@ def create_venv(env_name="virtual_dependencies"):
 def ensure_pip_installed():
     """Ensure pip is installed in the virtual environment."""
     python_exe = python_exec()
-    subprocess.run([python_exe, '-m', 'ensurepip'])
+    subprocess.run([python_exe, '-m', 'ensurepip', "--disable-pip-version-check"])
     debug_print("Ensured that pip is installed.")
 
 
@@ -96,7 +99,7 @@ def import_module(module, install_module):
         subprocess.call([python_exe, "import ", packageName])
     except:
         print("\nInstalling: " + module + " module")
-        subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--no-dependencies", "--upgrade", '--target', target, "-q"])
+        subprocess.call([python_exe, "-m", "pip", "install", install_module, "--no-warn-script-location", "--no-dependencies", "--upgrade", '--target', target, "-q", "--use-deprecated=legacy-resolver", "--disable-pip-version-check"])
 
         try:
             exec("import " + module)
@@ -105,134 +108,21 @@ def import_module(module, install_module):
     return True
 
 
-def install_packages(override: Optional[bool] = True):
-    """Install or update packages from the requirements.txt file."""
-    create_venv()  # Ensure the virtual environment exists before installation
-    os_platform = platform.system()
-    python_exe = python_exec()
-    requirements_txt = os.path.join(addon_script_path(), "requirements.txt")
-    target = venv_path()
-    
-    # Ensure pip is installed
-    ensure_pip_installed()
-    
-    # Upgrade pip
-    subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', 'pip'])
-    
-    # Install dependencies with or without override
-    if override:
-        subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', '--force-reinstall', '-r', requirements_txt, '--target', target, "-q"])
-    else:
-        subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', '-r', requirements_txt, '--target', target, "-q"])
-
-    # Add the virtual environment’s directory to sys.path
-    add_virtualenv_to_syspath()
-
-    print("\nInstalling: torch module")
-    if os_platform == "Windows":
-#        subprocess.call([pybin, "-m", "pip", "install", "torch==2.1.2+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.2+cu121 xformers==2.1.2+cu121", "--index-url", "https://download.pytorch.org/whl/cu121", "--user", "--upgrade"])
-#        subprocess.check_call(
-#            [
-#                python_exe,
-#                "-m",
-#                "pip",
-#                "install",
-#                "torch==2.1.2+cu124",
-#                #"torch==2.1.2+cu118",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu124",
-#                #"https://download.pytorch.org/whl/cu118",
-#                #"https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                "--user",
-#                "-q",
-#                #"--upgrade",
-#            ]
-#        )
-#        subprocess.check_call(
-#            [
-#                python_exe,
-#                "-m",
-#                "pip",
-#                "install",
-#                #"torchvision==0.17.0+cu121",
-#                "torchvision==0.16.0+cu124",
-#                #"torchvision==0.16.0+cu118",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu124",
-#                #"https://download.pytorch.org/whl/cu118",
-#                #"https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                "--user",
-#                "-q",
-#                #"--upgrade",
-#            ]
-#        )
-##        subprocess.check_call(
-##            [
-##                pybin,
-##                "-m",
-##                "pip",
-##                "install",
-##                "xformers", #==0.0.23
-##                "--index-url",
-##                "https://download.pytorch.org/whl/cu118",
-##                #"https://download.pytorch.org/whl/cu121",
-##                "--no-warn-script-location",
-##                "--user",
-##                #"--upgrade",
-##            ]
-##        )
-#        subprocess.check_call(
-#            [
-#                python_exe,
-#                "-m",
-#                "pip",
-#                "install",
-#                "torchaudio==2.1.2+cu124",
-#                #"torchaudio==2.1.2+cu118",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu124",
-#                #"https://download.pytorch.org/whl/cu118",
-#                #"https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                "--user",
-#                "-q",
-#                #"--upgrade",
-#            ]
-#        )
-        subprocess.check_call(
-            [
-                python_exe,
-                "-m",
-                "pip",
-                "install",
-                "torch==2.3.1+cu121",
-                "xformers",
-                "torchvision",
-                "--index-url",
-                "https://download.pytorch.org/whl/cu121",
-                "--no-warn-script-location",
-                "--upgrade",
-                '--target',
-                target,
-            ]
-        )
-    else:
-        import_module("torch", "torch")
-        import_module("torchvision", "torchvision")
-        import_module("torchaudio", "torchaudio")
-        import_module("xformers", "xformers")
-
-
-    # Check if all dependencies are installed
-    check_dependencies_installed()
-    print("n\Dependency installation finished.")
-
-
 def add_virtualenv_to_syspath():
     """Add the virtual environment's directory to sys.path."""
+    # Define the virtual environment path
     env_dir = venv_path()
+
+    # Ensure the site-packages folder of the venv is in the sys.path
+    site_packages_path = os.path.join(env_dir, 'lib', 'site-packages') if os.name == 'nt' else os.path.join(env_dir, 'lib', 'python3.x', 'site-packages')
+    
+    # Check if the site-packages directory exists
+    if not os.path.exists(site_packages_path):
+        debug_print(f"Virtual environment site-packages not found: {site_packages_path}")
+        return False
+    
+    # Add the site-packages path to sys.path
+    sys.path.insert(0, site_packages_path)
 
     # Add the virtual environment directory to sys.path for imports
     if os.path.exists(env_dir):
@@ -241,14 +131,184 @@ def add_virtualenv_to_syspath():
     else:
         debug_print(f"Virtual environment directory not found at: {env_dir}")
 
+    # Debug print sys.path
+    print(f"Using Python from: {sys.executable}")
+
+
+def set_virtualenv_python():
+    """Set the Python executable from the virtual environment."""
+    python_exe = os.path.join(venv_path(), 'Scripts', 'python.exe') if os.name == 'nt' else os.path.join(venv_path(), 'bin', 'python')
+
+    # Update sys.executable to use the virtual environment's Python
+    if os.path.exists(python_exe):
+        sys.executable = python_exe
+        debug_print(f"Using Python executable from virtual environment: {python_exe}")
+    else:
+        debug_print(f"Python executable not found in virtual environment: {python_exe}")
+
+
+def activate_virtualenv():
+    """Activate the virtual environment for the add-on."""
+    venv_path = os.path.join(bpy.utils.user_resource("SCRIPTS"), "addons", "2D_Assets-main", "virtual_dependencies")
+    
+    if not os.path.exists(venv_path):
+        print(f"Virtual environment path not found: {venv_path}")
+        return False
+    
+    # Define the correct paths for Windows or Unix-based systems
+    if platform.system() == 'Windows':
+        scripts_path = os.path.join(venv_path, "Scripts")
+        python_exe = os.path.join(scripts_path, "python.exe")
+    else:
+        bin_path = os.path.join(venv_path, "bin")
+        python_exe = os.path.join(bin_path, "python")
+    
+    if not os.path.exists(python_exe):
+        print(f"Python executable not found at: {python_exe}")
+        return False
+
+    # Set the virtual environment's Python executable as the current Python
+    sys.executable = python_exe
+
+    # Modify the PATH and PYTHONPATH to use the virtual environment's directories
+    if platform.system() == "Windows":
+        os.environ["PATH"] = scripts_path + os.pathsep + os.environ["PATH"]
+    else:
+        os.environ["PATH"] = bin_path + os.pathsep + os.environ["PATH"]
+    
+    # Update sys.path to include site-packages from the virtual environment
+    site_packages_path = os.path.join(venv_path, 'lib', 'site-packages')
+    sys.path.insert(0, site_packages_path)
+
+    print(f"Virtual environment activated: {venv_path}")
+    return True
+
+
+def install_packages(override: Optional[bool] = False):
+    """Install or update packages from the requirements.txt file."""
+    create_venv()  # Ensure the virtual environment exists before installation
+    # Add the virtual environment’s directory to sys.path
+    add_virtualenv_to_syspath()
+    activate_virtualenv()
+
+    # Set Python executable to the virtual environment
+    set_virtualenv_python()
+    
+    os_platform = platform.system()
+    
+    # Determine the name of the executables directory based on the OS
+    bin_dir_name = 'Scripts' if os.name == 'nt' else 'bin'
+    
+    # Construct the path to the 'bin' or 'Scripts' directory
+    bin_path = os.path.join(venv_path(), bin_dir_name)    
+    
+    python_exe = os.path.join(bin_path, "python")
+    
+    #os.environ["PIP_TARGET"] = venv_path()
+    requirements_txt = os.path.join(addon_script_path(), "requirements.txt")
+    venvpath = venv_path()
+    target = os.path.join(venvpath, 'lib', 'site-packages') if os.name == 'nt' else os.path.join(venvpath, 'lib', 'python3.x', 'site-packages')
+    
+    # Ensure pip is installed
+    ensure_pip_installed()
+    
+    # Upgrade pip
+    #subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', 'pip'])
+
+    # Install dependencies with or without override
+    if override:
+        subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', '--force-reinstall', '-r', requirements_txt, '--target', target, "--no-warn-script-location","--disable-pip-version-check"])
+    else:
+        subprocess.run([python_exe, '-m', 'pip', 'install', '--upgrade', '-r', requirements_txt, '--target', target, "--no-warn-script-location", "--disable-pip-version-check"])
+
+#    if os_platform == "Windows":
+#        subprocess.call([python_exe, "-m", "pip", "install", "--disable-pip-version-check", "https://github.com/woct0rdho/triton-windows/releases/download/v3.1.0-windows.post5/triton-3.1.0-cp311-cp311-win_amd64.whl", '--target', target, "--upgrade"])
+#    else:
+#        import_module("triton", "triton")
+
+#    if os_platform == "Windows":
+#        subprocess.call([python_exe, "-m", "pip", "install", "--disable-pip-version-check", "https://github.com/bitsandbytes-foundation/bitsandbytes/releases/download/continuous-release_multi-backend-refactor/bitsandbytes-0.44.1.dev0-py3-none-win_amd64.whl", '--target', target, "--upgrade"])
+#    elif os_platform == "Linux":
+#        subprocess.call([python_exe, "-m", "pip", "install", "--disable-pip-version-check", "https://github.com/bitsandbytes-foundation/bitsandbytes/releases/download/continuous-release_multi-backend-refactor/bitsandbytes-0.44.1.dev0-py3-none-manylinux_2_24_x86_64.whl", '--target', target, "--upgrade"])
+#    else:
+#        subprocess.call([python_exe, "-m", "pip", "install", "--disable-pip-version-check", "https://github.com/bitsandbytes-foundation/bitsandbytes/releases/download/continuous-release_multi-backend-refactor/bitsandbytes-0.44.1.dev0-py3-none-macosx_13_1_arm64.whl", '--target', target, "--upgrade"])
+
+    subprocess.call([python_exe, "-m", "pip", "install", "--disable-pip-version-check", "git+https://github.com/huggingface/accelerate.git", '--target', target, "--upgrade"])
+
+    print("\nInstalling: torch module")
+    if os_platform == "Windows":
+        #subprocess.call([python_exe, "-m", "pip", "install", "torch==2.1.2+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.2+cu121 xformers==2.1.2+cu121", "--index-url", "https://download.pytorch.org/whl/cu121", "--user", "--upgrade"])
+
+        subprocess.call(
+            [
+                python_exe,
+                "-m",
+                "pip",
+                "install",
+                '--force-reinstall',
+                "torch==2.3.1+cu121",
+                "xformers",
+                "torchvision",
+                "torchaudio",
+                "--index-url",
+                "https://download.pytorch.org/whl/cu121",
+                "--no-warn-script-location",
+                "--disable-pip-version-check",
+                '--target', target,
+                "--upgrade",
+            ]
+        )
+#        subprocess.call(
+#            [
+#                python_exe,
+#                "-m",
+#                "pip",
+#                "install",
+#                '--force-reinstall',
+#                "torchaudio==2.3.1+cu121",
+#                "--index-url",
+#                "https://download.pytorch.org/whl/cu121",
+#                "--no-warn-script-location",
+#                "--disable-pip-version-check",
+#                '--target', target,
+#                "--upgrade",
+#            ]
+#        )
+    else:
+        import_module("torch", "torch")
+        import_module("torchvision", "torchvision")
+        import_module("torchaudio", "torchaudio")
+        import_module("xformers", "xformers")
+
+    subprocess.call([python_exe, "-m", "pip", "install", "--user", '--force-reinstall', "numpy>=1.26.4", "--no-warn-script-location", "--no-warn-script-location", "--disable-pip-version-check"])
+    subprocess.call([python_exe, "-m", "pip", "install", "--upgrade", '--force-reinstall', "numpy>=1.26.4", "--no-warn-script-location", '--target', target, "--no-warn-script-location", "--disable-pip-version-check"])
+
+    # Check if all dependencies are installed
+    check_dependencies_installed()
+    print("\nDependency installation finished.")
+
+
+def parse_package_name(package_line):
+    """
+    Parse package name by removing version constraints and replacing hyphens with underscores.
+    """
+    # Split the package name on any version constraint symbols
+    package_name = re.split(r'[<>=!~]', package_line.strip())[0]
+    # Replace hyphens with underscores to match Python import conventions
+    package_name = package_name.replace('-', '_')
+    return package_name
 
 def check_dependencies_installed() -> bool:
     """Check if all the packages in the requirements.txt file are importable."""
     requirements_txt = os.path.join(addon_script_path(), "requirements.txt")
-    
+
     if not os.path.exists(requirements_txt):
         debug_print(f"Requirements file '{requirements_txt}' not found.")
         return False
+
+    add_virtualenv_to_syspath()
+    activate_virtualenv()
+    set_virtualenv_python()
 
     with open(requirements_txt, 'r') as file:
         packages = file.readlines()
@@ -257,24 +317,35 @@ def check_dependencies_installed() -> bool:
     
     # Check if each package is importable
     for package in packages:
-        package_name = package.strip()
-        if package_name:  # Avoid empty lines
+        package_name_raw = package.strip()
+        if package_name_raw:  # Avoid empty lines
+            # Parse the package name to get the importable format
+            package_name = parse_package_name(package_name_raw)
             try:
                 importlib.import_module(package_name)
                 print(f"Package '{package_name}' is already installed and importable.")
             except ImportError:
-                missing_packages.append(package_name)
-                print(f"Package '{package_name}' is missing or not importable.")
+                missing_packages.append(package_name)  # Keep original name in case of error
+                print(f"Package '{package_name_raw}' is missing or not importable.")
 
     if missing_packages:
         print(f"Missing or non-importable packages: {', '.join(missing_packages)}")
         return False
     return True
 
-
 def uninstall_packages():
     """Uninstall all packages listed in the requirements.txt file."""
-    python_exe = python_exec()
+    # Determine the name of the executables directory based on the OS
+    bin_dir_name = 'Scripts' if os.name == 'nt' else 'bin'
+    add_virtualenv_to_syspath()
+    activate_virtualenv()
+    set_virtualenv_python()
+    
+    # Construct the path to the 'bin' or 'Scripts' directory
+    bin_path = os.path.join(python_exec(), bin_dir_name)    
+    
+    python_exe = os.path.join(bin_path, "python")
+    
     requirements_txt = os.path.join(addon_script_path(), "requirements.txt")
 
     if not os.path.exists(requirements_txt):
@@ -283,15 +354,20 @@ def uninstall_packages():
 
     # Ensure pip is installed before running uninstall
     ensure_pip_installed()
+    add_virtualenv_to_syspath()
 
     with open(requirements_txt, 'r') as file:
         packages = file.readlines()
+    
+    #os.environ["PIP_TARGET"] = venv_path()
 
     for package in packages:
         package_name = package.strip()
         if package_name:  # Avoid empty lines
             subprocess.run([python_exe, '-m', 'pip', 'uninstall', '-y', package_name])
             debug_print(f"Uninstalled package: {package_name}")
+            
+    print("\nDependency uninstallation finished. Manually, delete this folder: "+venv_path())
 
 
 # Panel for Add-On Preferences
@@ -343,7 +419,7 @@ def flush():
     import torch
     import gc
     gc.collect()
-    if gfx_device == "cuda":
+    if gfx_device() == "cuda":
         torch.cuda.empty_cache()
         torch.cuda.reset_max_memory_allocated()
         # torch.cuda.reset_peak_memory_stats()
@@ -536,6 +612,10 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
     bl_options = {"REGISTER", "UNDO"}
 
     def execute(self, context):
+        create_venv() 
+        add_virtualenv_to_syspath()
+        activate_virtualenv()
+        set_virtualenv_python()
         try:
             import diffusers
         except:
@@ -702,8 +782,8 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         out = pipe(
             prompt=prompt,
             guidance_scale=3.8,
-            height=1024,
-            width=1024,
+            height=1440,
+            width=1440,
             num_inference_steps=25,
             max_sequence_length=256,
         ).images[0]
@@ -731,11 +811,11 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         asset_name = context.scene.asset_name
 
         birefnet = AutoModelForImageSegmentation.from_pretrained("ZhengPeng7/BiRefNet", trust_remote_code=True)
-        birefnet.to(gfx_device)
+        birefnet.to(gfx_device())
 
         transform_image = transforms.Compose(
             [
-                transforms.Resize((1024, 1024)),
+                transforms.Resize((1440, 1440)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
@@ -744,7 +824,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Load and transform the image
         image = Image.open(image_path).convert("RGB")
         image_size = image.size
-        input_image = transform_image(image).unsqueeze(0).to(gfx_device)
+        input_image = transform_image(image).unsqueeze(0).to(gfx_device())
 
         # Generate the background mask
         with torch.no_grad():
@@ -793,16 +873,16 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         from PIL import Image, ImageFilter
 
         birefnet = AutoModelForImageSegmentation.from_pretrained("ZhengPeng7/BiRefNet", trust_remote_code=True)
-        birefnet.to(gfx_device)
+        birefnet.to(gfx_device())
         image_size = image.size
         transform_image = transforms.Compose(
             [
-                transforms.Resize((1024, 1024)),
+                transforms.Resize((1440, 1440)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
         )
-        input_images = transform_image(image).unsqueeze(0).to(gfx_device)
+        input_images = transform_image(image).unsqueeze(0).to(gfx_device())
 
         # Prediction
         with torch.no_grad():
@@ -848,6 +928,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Crop the image to the bounding box
         return image.crop((left, top, right + 1, bottom + 1))
 
+
     def split_by_alpha_islands(self, image_path, output_prefix):
         from PIL import Image, ImageFilter
         import numpy as np
@@ -889,7 +970,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         import bpy
         from PIL import Image, ImageFilter
 
-        get_unique_asset_name(self, context)
+        #get_unique_asset_name(self, context)
         asset_name = context.scene.asset_name
 
         # Ensure the image exists
