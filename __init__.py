@@ -8,6 +8,7 @@ bl_info = {
     "description": "2D Asset Generator in the 3D View",
 }
 
+
 import bpy
 from bpy.types import Operator, PropertyGroup, Panel, AddonPreferences
 from bpy.props import StringProperty, EnumProperty
@@ -22,26 +23,25 @@ import importlib
 from typing import Optional
 import platform
 
+
 def gfx_device():
-    try:
-        exec("import torch")
-        if torch.cuda.is_available():
-            gfxdevice = "cuda"
-        elif torch.backends.mps.is_available():
-            gfxdevice = "mps"
-        else:
-            gfxdevice = "cpu"
-    except:
-        print("2D Asset Generator dependencies needs to be installed and Blender needs to be restarted.")
+#    try:
+    import torch
+    if torch.cuda.is_available():
+        gfxdevice = "cuda"
+    elif torch.backends.mps.is_available():
+        gfxdevice = "mps"
+    else:
         gfxdevice = "cpu"
+#    except:
+#        print("2D Asset Generator dependencies needs to be installed and Blender needs to be restarted.")
+#        gfxdevice = "cpu"
     return gfxdevice
 
-DEBUG = True
-
+DEBUG = False
 
 dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D Assets")
 os.makedirs(dir_path, exist_ok=True)
-
 
 
 def debug_print(*args, **kwargs):
@@ -790,13 +790,9 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         # Save the generated image
         asset_name = re.sub(r'[<>:"/\\|?*]', "", context.scene.asset_name)
-        image_path = bpy.path.abspath(
-            join(
-                bpy.utils.user_resource("DATAFILES"),
-                "2D Assets",
-                f"{asset_name}_generated_image.png",
-            )
-        )
+        print("Datafiles: "+bpy.utils.user_resource("DATAFILES"))
+        image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D Assets", f"{asset_name}_generated_image.png"))
+        print("Save Path: "+image_path)
         out.save(image_path)
         return image_path
 
@@ -839,13 +835,15 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Apply the refined mask to the image to remove the background
         image.putalpha(refined_mask)
         asset_name = re.sub(r'[<>:"/\\|?*]', "", context.scene.asset_name)
-        transparent_image_path = bpy.path.abspath(
-            join(
-                bpy.utils.user_resource("DATAFILES"),
-                "2D Assets",
-                f"{asset_name}_generated_image_transparent.png",
-            )
-        )  # Use asset name
+        transparent_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D Assets", f"{asset_name}_generated_image_transparent.png"))
+
+#        transparent_image_path = bpy.path.abspath(
+#            join(
+#                bpy.path.abspath(bpy.utils.user_resource("DATAFILES")),
+#                "2D Assets",
+#                f"\\{asset_name}_generated_image_transparent.png",
+#            )
+#        )  # Use asset name
         image.save(transparent_image_path)
 
         return transparent_image_path
@@ -955,7 +953,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
                 character_img = img.crop((bbox[1].start, bbox[0].start, bbox[1].stop, bbox[0].stop))
 
                 # Generate the file path and save each cropped character instance
-                file_path = os.path.dirname(image_path) + f"{output_prefix}_{i}.png"
+                file_path = os.path.dirname(image_path) + "\\" + f"{output_prefix}_{i}.png"
                 file_path = get_unique_file_name(file_path)
                 character_img.save(file_path)
                 saved_paths.append(file_path)
@@ -985,13 +983,15 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         processed_image = self.process_image(image)
         asset_name = re.sub(r'[<>:"/\\|?*]', "", asset_name)
         # Save the cropped image
-        processed_image_path = bpy.path.abspath(
-            os.path.join(
-                bpy.utils.user_resource("DATAFILES"),
-                "2D Assets",
-                asset_name + "_processed_image.png",
-            )
-        )
+        processed_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D Assets", f"{asset_name}_processed_image.png"))
+
+#        processed_image_path = bpy.path.abspath(
+#            os.path.join(
+#                bpy.path.abspath(bpy.utils.user_resource("DATAFILES")),
+#                "2D Assets",
+#                "\\"+asset_name + "_processed_image.png",
+#            )
+#        )
         processed_image.save(processed_image_path)
         if DEBUG:
             print(processed_image_path)
@@ -1059,7 +1059,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         # Enable transparency in the material
         material.blend_method = "HASHED"  #'BLEND'
-        material.shadow_method = "OPAQUE"
+        #material.shadow_method = "OPAQUE"
         material.surface_render_method = "DITHERED"
 
         # obj = bpy.ops.image.import_as_mesh_planes(filepath=transparent_image_path, files=[{"name":os.path.basename(transparent_image_path), "name":os.path.basename(transparent_image_path)}], directory=os.path.dirname(transparent_image_path))
