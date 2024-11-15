@@ -25,22 +25,22 @@ import platform
 
 
 def gfx_device():
-#    try:
-    import torch
-    if torch.cuda.is_available():
-        gfxdevice = "cuda"
-    elif torch.backends.mps.is_available():
-        gfxdevice = "mps"
-    else:
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gfxdevice = "cuda"
+        elif torch.backends.mps.is_available():
+            gfxdevice = "mps"
+        else:
+            gfxdevice = "cpu"
+    except:
+        print("2D Asset Generator dependencies needs to be installed and Blender needs to be restarted.")
         gfxdevice = "cpu"
-#    except:
-#        print("2D Asset Generator dependencies needs to be installed and Blender needs to be restarted.")
-#        gfxdevice = "cpu"
     return gfxdevice
 
 DEBUG = False
 
-dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D Assets")
+dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D_Asset_Generator")
 os.makedirs(dir_path, exist_ok=True)
 
 
@@ -550,7 +550,7 @@ def get_unique_asset_name(self, context):
 
     # Retrieve base name and check for validity
     base_name = context.scene.asset_name
-    if not base_name:
+    if base_name == "":
         # If base name is missing, use the asset prompt or a default
         prompt = context.scene.asset_prompt
         base_name = "_".join(prompt.split()[:2]) if prompt else "Asset"
@@ -560,26 +560,25 @@ def get_unique_asset_name(self, context):
     existing_names = {obj.name for obj in bpy.data.objects if getattr(obj, "asset_data", None)}
 
     # If the base name is unique, return it directly
-    if base_name not in existing_names:
-        return
+    if base_name in existing_names:
 
-    # Attempt to extract an existing number suffix in parentheses, if present
-    match = re.search(r"\((\d+)\)$", base_name)
-    if match:
-        base_name = base_name[: match.start()].strip()
-        counter = int(match.group(1)) + 1
-    else:
-        counter = 1
+        # Attempt to extract an existing number suffix in parentheses, if present
+        match = re.search(r"\((\d+)\)$", base_name)
+        if match:
+            base_name = base_name[: match.start()].strip()
+            counter = int(match.group(1)) + 1
+        else:
+            counter = 1
 
-    # Generate a unique name by incrementing the counter until no conflicts remain
-    unique_name = f"{base_name} ({counter})"
-    while unique_name in existing_names:
-        counter += 1
+        # Generate a unique name by incrementing the counter until no conflicts remain
         unique_name = f"{base_name} ({counter})"
+        while unique_name in existing_names:
+            counter += 1
+            unique_name = f"{base_name} ({counter})"
 
-    # Set the unique name in the context and return it
-    unique_name = get_unique_file_name(unique_name)
-    context.scene.asset_name = unique_name
+        # Set the unique name in the context and return it
+        #unique_name = get_unique_file_name(unique_name)
+        context.scene.asset_name = unique_name
     return
 
 
@@ -638,9 +637,13 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
             for index, line in enumerate(lines):
                 if line:
                     # Fetch the prompt from the scene
-                    context.scene.asset_prompt = line
-                    base_name = " ".join(line.split()[:3]) if line else "Asset"
-                    context.scene.asset_name = base_name.title()
+                    if input_type == "TEXT_BLOCK":
+                        context.scene.asset_prompt = line
+                        base_name = " ".join(line.split()[:3]) if line else "Asset"
+                        context.scene.asset_name = base_name.title()
+                    else:
+                        base_name = context.scene.asset_name
+                        
                     description = context.scene.asset_prompt
                     print(str(index + 1) + "/" + str(len(lines)) + ": " + base_name.title())
 
@@ -768,7 +771,11 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         )
 
         pipe = FluxPipeline.from_pretrained(image_model_card, transformer=model_nf4, torch_dtype=torch.bfloat16)
-        pipe.enable_model_cpu_offload()
+
+        if gfx_device() == "mps":
+            pipe.to(gfx_device())
+        else:
+            pipe.enable_model_cpu_offload()
         return pipe
 
     # FLUX
@@ -781,19 +788,19 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         prompt = "neutral background, " + description
         out = pipe(
             prompt=prompt,
-            guidance_scale=3.8,
-            height=1440,
-            width=1440,
+            guidance_scale=2.8,
+            height=1024,
+            width=1024,
             num_inference_steps=25,
             max_sequence_length=256,
         ).images[0]
 
         # Save the generated image
         asset_name = re.sub(r'[<>:"/\\|?*]', "", context.scene.asset_name)
-        print("Datafiles: "+bpy.utils.user_resource("DATAFILES"))
-        image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D Assets", f"{asset_name}_generated_image.png"))
-        print("Save Path: "+image_path)
+        debug_print("Datafiles: "+bpy.utils.user_resource("DATAFILES"))
+        image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator", f"{asset_name}_generated_image.png"))
         out.save(image_path)
+        debug_print("Save Path: "+image_path)
         return image_path
 
     def remove_background(self, context, image_path):
@@ -811,7 +818,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         transform_image = transforms.Compose(
             [
-                transforms.Resize((1440, 1440)),
+                transforms.Resize((1024, 1024)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
@@ -835,15 +842,9 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Apply the refined mask to the image to remove the background
         image.putalpha(refined_mask)
         asset_name = re.sub(r'[<>:"/\\|?*]', "", context.scene.asset_name)
-        transparent_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D Assets", f"{asset_name}_generated_image_transparent.png"))
+        transparent_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator", f"{asset_name}_generated_image_transparent.png"))
 
-#        transparent_image_path = bpy.path.abspath(
-#            join(
-#                bpy.path.abspath(bpy.utils.user_resource("DATAFILES")),
-#                "2D Assets",
-#                f"\\{asset_name}_generated_image_transparent.png",
-#            )
-#        )  # Use asset name
+        debug_print("Save Transparent Path: "+transparent_image_path)
         image.save(transparent_image_path)
 
         return transparent_image_path
@@ -875,7 +876,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         image_size = image.size
         transform_image = transforms.Compose(
             [
-                transforms.Resize((1440, 1440)),
+                transforms.Resize((1024, 1024)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
             ]
@@ -983,18 +984,11 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         processed_image = self.process_image(image)
         asset_name = re.sub(r'[<>:"/\\|?*]', "", asset_name)
         # Save the cropped image
-        processed_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D Assets", f"{asset_name}_processed_image.png"))
+        processed_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator", f"{asset_name}_processed_image.png"))
 
-#        processed_image_path = bpy.path.abspath(
-#            os.path.join(
-#                bpy.path.abspath(bpy.utils.user_resource("DATAFILES")),
-#                "2D Assets",
-#                "\\"+asset_name + "_processed_image.png",
-#            )
-#        )
-        processed_image.save(processed_image_path)
         if DEBUG:
-            print(processed_image_path)
+            print("processed_image_path: "+processed_image_path)
+        processed_image.save(processed_image_path)
 
         # Create a new material with transparency support
         material = bpy.data.materials.new(name="ImageMaterial")
@@ -1113,10 +1107,12 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         obj.asset_data.description = prompt  # f"Generated from: {os.path.basename(transparent_image_path)}"
         obj.asset_data.tags.new(name="GeneratedAsset")
 
-        get_unique_asset_name(self, context)
+        #get_unique_asset_name(self, context)
 
         if DEBUG:
             self.report({"INFO"}, "3D object created and added to the asset library")
+            
+        context.scene.asset_name = context.scene.asset_name
 
 
 # UI Panel for Asset Generation and Setup
