@@ -246,7 +246,7 @@ def install_packages(override: Optional[bool] = False):
                 "pip",
                 "install",
                 '--force-reinstall',
-                "torch==2.3.1+cu121",
+                "torch==2.2.1+cu121",
                 "xformers",
                 "torchvision",
                 "torchaudio",
