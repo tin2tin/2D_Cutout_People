@@ -40,7 +40,7 @@ def gfx_device():
 
 DEBUG = False
 
-dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D_Asset_Generator")
+dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D_Asset_Generator-main")
 os.makedirs(dir_path, exist_ok=True)
 
 
@@ -149,7 +149,7 @@ def set_virtualenv_python():
 
 def activate_virtualenv():
     """Activate the virtual environment for the add-on."""
-    venv_path = os.path.join(bpy.utils.user_resource("SCRIPTS"), "addons", "2D_Assets-main", "virtual_dependencies")
+    venv_path = os.path.join(bpy.utils.user_resource("SCRIPTS"), "addons", "2D_Asset_Generator-main", "virtual_dependencies")
     
     if not os.path.exists(venv_path):
         print(f"Virtual environment path not found: {venv_path}")
@@ -280,8 +280,8 @@ def install_packages(override: Optional[bool] = False):
         import_module("torchaudio", "torchaudio")
         import_module("xformers", "xformers")
 
-    subprocess.call([python_exe, "-m", "pip", "install", "--user", '--force-reinstall', "numpy>=1.26.4", "--no-warn-script-location", "--no-warn-script-location", "--disable-pip-version-check"])
-    subprocess.call([python_exe, "-m", "pip", "install", "--upgrade", '--force-reinstall', "numpy>=1.26.4", "--no-warn-script-location", '--target', target, "--no-warn-script-location", "--disable-pip-version-check"])
+    subprocess.call([python_exe, "-m", "pip", "install", "--user", '--force-reinstall', "numpy==1.26.4", "--no-warn-script-location", "--no-warn-script-location", "--disable-pip-version-check"])
+    subprocess.call([python_exe, "-m", "pip", "install", "--upgrade", '--force-reinstall', "numpy==1.26.4", "--no-warn-script-location", '--target', target, "--no-warn-script-location", "--disable-pip-version-check"])
 
     # Check if all dependencies are installed
     check_dependencies_installed()
@@ -798,7 +798,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Save the generated image
         asset_name = re.sub(r'[<>:"/\\|?*]', "", context.scene.asset_name)
         debug_print("Datafiles: "+bpy.utils.user_resource("DATAFILES"))
-        image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator", f"{asset_name}_generated_image.png"))
+        image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator-main", f"{asset_name}_generated_image.png"))
         out.save(image_path)
         debug_print("Save Path: "+image_path)
         return image_path
@@ -842,7 +842,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Apply the refined mask to the image to remove the background
         image.putalpha(refined_mask)
         asset_name = re.sub(r'[<>:"/\\|?*]', "", context.scene.asset_name)
-        transparent_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator", f"{asset_name}_generated_image_transparent.png"))
+        transparent_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator-main", f"{asset_name}_generated_image_transparent.png"))
 
         debug_print("Save Transparent Path: "+transparent_image_path)
         image.save(transparent_image_path)
@@ -984,7 +984,7 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         processed_image = self.process_image(image)
         asset_name = re.sub(r'[<>:"/\\|?*]', "", asset_name)
         # Save the cropped image
-        processed_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator", f"{asset_name}_processed_image.png"))
+        processed_image_path = bpy.path.abspath(os.path.join(bpy.path.abspath(bpy.utils.user_resource("DATAFILES")), "2D_Asset_Generator-main", f"{asset_name}_processed_image.png"))
 
         if DEBUG:
             print("processed_image_path: "+processed_image_path)
