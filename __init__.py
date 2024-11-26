@@ -38,7 +38,7 @@ def gfx_device():
         gfxdevice = "cpu"
     return gfxdevice
 
-DEBUG = False
+DEBUG = True
 
 dir_path = os.path.join(bpy.utils.user_resource("DATAFILES"), "2D_Asset_Generator")
 os.makedirs(dir_path, exist_ok=True)
@@ -237,7 +237,6 @@ def install_packages(override: Optional[bool] = False):
 
     print("\nInstalling: torch module")
     if os_platform == "Windows":
-        #subprocess.call([python_exe, "-m", "pip", "install", "torch==2.1.2+cu121 torchvision==0.16.0+cu121 torchaudio==2.1.2+cu121 xformers==2.1.2+cu121", "--index-url", "https://download.pytorch.org/whl/cu121", "--user", "--upgrade"])
 
         subprocess.call(
             [
@@ -245,43 +244,23 @@ def install_packages(override: Optional[bool] = False):
                 "-m",
                 "pip",
                 "install",
-                '--force-reinstall',
                 "torch==2.3.1+cu121",
                 "xformers",
                 "torchvision",
-                "torchaudio",
                 "--index-url",
                 "https://download.pytorch.org/whl/cu121",
                 "--no-warn-script-location",
-                "--disable-pip-version-check",
-                '--target', target,
+                '--target', target, 
                 "--upgrade",
             ]
         )
-#        subprocess.call(
-#            [
-#                python_exe,
-#                "-m",
-#                "pip",
-#                "install",
-#                '--force-reinstall',
-#                "torchaudio==2.3.1+cu121",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                "--disable-pip-version-check",
-#                '--target', target,
-#                "--upgrade",
-#            ]
-#        )
     else:
         import_module("torch", "torch")
         import_module("torchvision", "torchvision")
-        import_module("torchaudio", "torchaudio")
         import_module("xformers", "xformers")
 
-    subprocess.call([python_exe, "-m", "pip", "install", "--user", '--force-reinstall', "numpy>=1.26.4", "--no-warn-script-location", "--no-warn-script-location", "--disable-pip-version-check"])
-    subprocess.call([python_exe, "-m", "pip", "install", "--upgrade", '--force-reinstall', "numpy>=1.26.4", "--no-warn-script-location", '--target', target, "--no-warn-script-location", "--disable-pip-version-check"])
+    subprocess.call([python_exe, "-m", "pip", "install", "--user", '--force-reinstall', "numpy==1.26.4", "--no-warn-script-location", "--no-warn-script-location", "--disable-pip-version-check"])
+    subprocess.call([python_exe, "-m", "pip", "install", "--upgrade", '--force-reinstall', "numpy==1.26.4", "--no-warn-script-location", '--target', target, "--no-warn-script-location", "--disable-pip-version-check"])
 
     # Check if all dependencies are installed
     check_dependencies_installed()
@@ -300,6 +279,16 @@ def parse_package_name(package_line):
 
 def check_dependencies_installed() -> bool:
     """Check if all the packages in the requirements.txt file are importable."""
+    import os
+    # Determine the name of the executables directory based on the OS
+    bin_dir_name = 'Scripts' if os.name == 'nt' else 'bin'
+    venvpath = venv_path()
+    target = os.path.join(venvpath, 'lib', 'site-packages') if os.name == 'nt' else os.path.join(venvpath, 'lib', 'python3.x', 'site-packages')
+    
+    # Construct the path to the 'bin' or 'Scripts' directory
+    bin_path = os.path.join(venv_path(), bin_dir_name) 
+    python_exe = os.path.join(bin_path, "python")
+    subprocess.call([python_exe, "-m", "pip", "list", "--disable-pip-version-check"])
     requirements_txt = os.path.join(addon_script_path(), "requirements.txt")
 
     if not os.path.exists(requirements_txt):
@@ -335,15 +324,17 @@ def check_dependencies_installed() -> bool:
 
 def uninstall_packages():
     """Uninstall all packages listed in the requirements.txt file."""
+    import os
     # Determine the name of the executables directory based on the OS
     bin_dir_name = 'Scripts' if os.name == 'nt' else 'bin'
     add_virtualenv_to_syspath()
     activate_virtualenv()
     set_virtualenv_python()
+    venvpath = venv_path()
     
     # Construct the path to the 'bin' or 'Scripts' directory
-    bin_path = os.path.join(python_exec(), bin_dir_name)    
-    
+    bin_path = os.path.join(venv_path(), bin_dir_name) 
+    #bin_path = os.path.join(python_exec(), bin_dir_name)
     python_exe = os.path.join(bin_path, "python")
     
     requirements_txt = os.path.join(addon_script_path(), "requirements.txt")
@@ -364,9 +355,11 @@ def uninstall_packages():
     for package in packages:
         package_name = package.strip()
         if package_name:  # Avoid empty lines
-            subprocess.run([python_exe, '-m', 'pip', 'uninstall', '-y', package_name])
-            debug_print(f"Uninstalled package: {package_name}")
-            
+            debug_print(f"Uninstalling package: {package_name}")
+            try:
+                subprocess.run([python_exe, '-m', 'pip', 'uninstall', "-y", str(package_name), "--disable-pip-version-check"])
+            except:
+                print(f"Package '{package_name}' is missing or not possible to uninstall.")            
     print("\nDependency uninstallation finished. Manually, delete this folder: "+venv_path())
 
 
@@ -458,91 +451,6 @@ class Import_Text_Props(PropertyGroup):
         update=update_text_list,
         description="Text-Blocks",
     )
-
-
-#class FLUX_OT_SetupEnvironment(bpy.types.Operator):
-#    """Set up a environment and install dependencies"""
-
-#    bl_idname = "object.setup_flux_env"
-#    bl_label = "Set up Environment"
-#    bl_options = {"REGISTER", "UNDO"}
-
-#    def execute(self, context):
-#        # try:
-#        # import sys
-#        # Get the current Blender Python executable
-#        # python_executable = sys.executable
-
-#        #            # Path for virtual environment
-#        #            venv_dir = bpy.path.abspath("//flux_venv")
-
-#        #            # Step 1: Create the virtual environment
-#        #            if not os.path.exists(venv_dir):
-#        #                subprocess.run([python_executable, "-m", "venv", venv_dir], check=True)
-#        #                self.report({'INFO'}, f"Virtual environment created at {venv_dir}")
-#        #            else:
-#        #                self.report({'INFO'}, "Virtual environment already exists.")
-#        # Step 2: Install dependencies
-#        self.install_dependencies(python_exec())
-
-#        return {"FINISHED"}
-
-#    #        except Exception as e:
-#    #            self.report({'ERROR'}, f"Error setting up environment: {str(e)}")
-#    #            return {'CANCELLED'}
-
-#    def install_dependencies(self, venv_dir):
-#        """Install required Python packages in the virtual environment"""
-#        python_executable = venv_dir  # os.path.join(venv_dir, "bin", "python")  # Linux/Unix path to python
-#        #        if sys.platform == "win32":
-#        #            python_executable = os.path.join(venv_dir, "Scripts", "python.exe")  # Windows path to python
-#        subprocess.check_call(
-#            [
-#                python_executable,
-#                "-m",
-#                "pip",
-#                "install",
-#                "torch==2.3.1+cu121",
-#                "xformers",
-#                "torchvision",
-#                "--index-url",
-#                "https://download.pytorch.org/whl/cu121",
-#                "--no-warn-script-location",
-#                # "--user",
-#                "--upgrade",
-#            ]
-#        )
-
-#        # Packages to install
-#        packages = [
-#            "diffusers",
-#            "transformers",
-#            "Pillow",
-#            "bitsandbytes",
-#            "botocore",
-#            "ml-dtypes",
-#            "protobuf==3.20.1",
-#            "tqdm",
-#            "markupsafe",
-#        ]
-
-#        # Install packages using the virtual environment's pip
-#        for package in packages:
-#            subprocess.run(
-#                [
-#                    python_executable,
-#                    "-m",
-#                    "pip",
-#                    "install",
-#                    "--disable-pip-version-check",
-#                    "--use-deprecated=legacy-resolver",
-#                    package,
-#                    "--no-warn-script-location",
-#                    "--upgrade",
-#                ],
-#                check=True,
-#            )
-#        self.report({"INFO"}, "\nDependencies installed successfully.")
 
 
 def get_unique_asset_name(self, context):
@@ -744,16 +652,13 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
     def load_model(self, context):
         """Generates an image using the FLUX model based on the user input."""
 
-        # Import dependencies inside the method to avoid potential module issues before installation
-        from diffusers import FluxPipeline
-        import torch
+#        # Import dependencies inside the method to avoid potential module issues before installation
+#        from diffusers import FluxPipeline
+#        import torch
 
-        # asset_name = context.scene.asset_name
-        # If bitsandbytes doesn't work, use this:
-        #        pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
-        #        pipe.enable_sequential_cpu_offload()
-        #        pipe.enable_vae_slicing()
-        #        pipe.vae.enable_tiling()
+#        asset_name = context.scene.asset_name
+#         #If bitsandbytes doesn't work, use this:
+#        pipe = FluxPipeline.from_pretrained("black-forest-labs/FLUX.1-schnell", torch_dtype=torch.bfloat16)
 
         from diffusers import BitsAndBytesConfig, FluxTransformer2DModel
 
@@ -775,7 +680,10 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         if gfx_device() == "mps":
             pipe.to(gfx_device())
         else:
-            pipe.enable_model_cpu_offload()
+            pipe.enable_sequential_cpu_offload()
+            pipe.enable_vae_slicing()
+            pipe.vae.enable_tiling()
+            #pipe.enable_model_cpu_offload()
         return pipe
 
     # FLUX
@@ -963,10 +871,41 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         return saved_paths
 
+
+    def create_normal_map(self, image_path, output_path=None):
+        """ Generates a normal map from the input image and saves it to the specified location. """
+        # Import necessary libraries
+        #import os
+        from controlnet_aux import NormalBaeDetector
+        from diffusers.utils import load_image
+        from PIL import Image
+
+        # Load the NormalBaeDetector model
+        normal_bae = NormalBaeDetector.from_pretrained("lllyasviel/Annotators")
+        normal_bae.to("cuda")  # Move model to GPU
+
+        # Load the input image
+        input_image = load_image(image_path)
+        
+        # Generate the normal map
+        normal_map = normal_bae(input_image)
+
+        # Define the output path
+        if output_path is None:
+            base, ext = os.path.splitext(image_path)
+            output_path = f"{base}_normal_map{ext}"
+
+        # Convert normal_map to a PIL image and save it
+        normal_map_image = Image.fromarray((normal_map * 255).astype("uint8"))
+        normal_map_image.save(output_path)
+
+        return output_path
+
+
     def convert_to_3d(self, context, transparent_image_path, prompt):
         """Converts an image with transparency into a 3D object (plane) and adds it to the asset library."""
-        import os
-        import bpy
+        #import os
+        #import bpy
         from PIL import Image, ImageFilter
 
         #get_unique_asset_name(self, context)
@@ -988,7 +927,10 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
 
         if DEBUG:
             print("processed_image_path: "+processed_image_path)
+
         processed_image.save(processed_image_path)
+
+        normal_map_path = create_normal_map(processed_image_path)
 
         # Create a new material with transparency support
         material = bpy.data.materials.new(name="ImageMaterial")
@@ -1005,9 +947,23 @@ class FLUX_OT_GenerateAsset(bpy.types.Operator):
         # Add a ColorRamp node between the texture and BSDF
         color_ramp_node = material.node_tree.nodes.new("ShaderNodeValToRGB")
 
+        # Add an Image Texture node for the normal map
+        normal_map_texture_node = nodes.new(type='ShaderNodeTexImage')
+        normal_map_texture_node.image = bpy.data.images.load(normal_map_path)  # Load the saved normal map
+        normal_map_texture_node.image.colorspace_settings.name = 'Non-Color'  # Set as Non-Color Data
+
+        # Add a Normal Map node
+        normal_map_node = nodes.new(type='ShaderNodeNormalMap')
+
+        # Link the nodes
+        links.new(normal_map_texture_node.outputs["Color"], normal_map_node.inputs["Color"])  # Link image to normal map node
+        links.new(normal_map_node.outputs["Normal"], bsdf.inputs["Normal"])  # Link normal map to BSD
+
         # Position nodes for better visual organization in the node editor
         tex_image_node.location = (-900, 300)
         color_ramp_node.location = (-600, 300)
+        normal_map_texture_node.location = (-400, 0)
+        normal_map_node.location = (-200, 0)
         bsdf.location = (-300, 300)
 
         # Connect the texture's color output to the ColorRamp node input
