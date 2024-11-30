@@ -22,6 +22,10 @@ https://github.com/user-attachments/assets/6cce7ca7-7817-4406-b6c4-6d4e8c414ed4
 
 To install an add-on in Blender, follow these simple steps:
 
+### 0. **Download and install Git:**
+
+   - First, download and install git (must be on PATH): https://git-scm.com/downloads
+
 ### 1. **Download the Add-on:**
    - From [here!](https://github.com/tin2tin/2D_Billboard_People/archive/refs/heads/main.zip)
 
